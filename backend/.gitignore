@@ -18,3 +18,7 @@ build/
 # Ignore IDE/editor files
 .vscode/
 .idea/
+
+# temp files
+resume.pdf
+resume.md
