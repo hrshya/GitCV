@@ -22,3 +22,5 @@ build/
 # temp files
 resume.pdf
 resume.md
+
+/src/generated/prisma
