@@ -6,6 +6,7 @@ import { geminiResponse } from "../function/openAi.ts";
 import { generateMarkdownResume } from "../function/markDown.ts";
 import fs from "fs";
 import { markdownToPDF } from "../function/generatePDF.ts";
+import { prisma } from "../db.ts";
 
 dotenv.config();
 
@@ -41,13 +42,68 @@ githubRouter.get("/", async (req, res) => {
       }
     );
 
-    // ---------- RANK REPOS ----------
+    let user = await prisma.user.findUnique({
+      where: {
+        githubUsername: username,
+      },
+    });
 
-    const rankedRepos = await RankingSystem(
-      repoResponse.data,
-      username
-    );
+    let rankedRepos;
 
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          githubUsername: username,
+          name: userResponse.data.name,
+          email: userResponse.data.email,
+        },
+      });
+
+      rankedRepos = await RankingSystem(
+        repoResponse.data,
+        username
+      );
+
+      for (const ranked of rankedRepos) {
+        const metadata = {
+          summary: ranked.summary,
+          stack: ranked.stack,
+          key_features: ranked.key_features,
+          complexity_tags: ranked.complexity_tags,
+          impact_signals: ranked.impact_signals,
+          structure: ranked.structure,
+          highlight_hint: ranked.highlight_hint,
+        };  
+        await prisma.repoCache.create({
+          data: {
+            userId: user.id,
+            repoName: ranked.project_name,
+            score: ranked.score,
+            metadata: metadata,
+          },
+        });
+      }
+    }
+
+    if(!rankedRepos) {
+      const cachedRepos = await prisma.repoCache.findMany({
+        where: {
+          userId: user.id,
+        },
+      });
+      rankedRepos = cachedRepos.map((cache: any) => ({
+        project_name: cache.repoName,
+        score: cache.score,
+        summary: cache.metadata.summary,
+        stack: cache.metadata.stack,
+        key_features: cache.metadata.key_features,
+        complexity_tags: cache.metadata.complexity_tags,
+        impact_signals: cache.metadata.impact_signals,
+        structure: cache.metadata.structure,
+        highlight_hint: cache.metadata.highlight_hint,
+      }));
+    }
+    
     // ---------- LLM RESPONSE ----------
 
     let response;
@@ -60,6 +116,27 @@ githubRouter.get("/", async (req, res) => {
       );
 
       if (response) response = JSON.parse(response);
+      let userCache = await prisma.userCache.findUnique({
+        where: {
+          userId: user.id,
+        },
+      });
+
+      if(!userCache) {
+        let temp = {
+          name: response.user.name,
+          contact: response.user.contact,
+          experience: response.experience,
+          education: response.education,
+          skills: response.skills,
+        }
+        await prisma.userCache.create({
+          data: {
+            userId: user.id,
+            details: temp,
+          },
+        });
+      }
     }
 
     // ---------- RESUME MARKDOWN ----------
