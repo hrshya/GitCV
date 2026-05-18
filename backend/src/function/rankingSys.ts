@@ -53,8 +53,6 @@ async function processRepo(repo: GitHubRepo, username: string) {
       key_features: [],
       complexity_tags: [],
       score: 0,
-      signals: {} as any,
-      architecture: { client: "", server: "", data_sync: "" },
       impact_signals: {
         stars: 0,
         forks: 0,
@@ -381,12 +379,6 @@ async function processRepo(repo: GitHubRepo, username: string) {
     key_features,
     complexity_tags,
     score: final_score,
-    signals,
-    architecture: {
-      client: signals.core.frontend ? "Frontend" : "None",
-      server: signals.core.backend ? "Backend" : "None",
-      data_sync: signals.system.realtime ? "Realtime" : "Request-response",
-    },
     impact_signals: {
       stars: repo.stargazers_count,
       forks: repo.forks_count,

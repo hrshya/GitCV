@@ -107,12 +107,6 @@ export const RankedSchema = z.object({
     key_features: z.array(z.string()),
     complexity_tags: z.array(z.string()),
     score: z.number(),
-    signals: Signals,
-    architecture: z.object({
-        client: z.string(),
-        server: z.string(),
-        data_sync: z.string(),
-    }),
     impact_signals: z.object({
         stars: z.number(),
         forks: z.number(),
