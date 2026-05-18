@@ -185,6 +185,13 @@ githubRouter.get("/", async (req, res) => {
       achievements: response?.achievements || [],
     });
 
+    await prisma.resume.create({
+      data: {
+        userId: user.id,
+        markdown: resumeMarkdown,
+      },
+    });
+
     // ---------- SAVE FILE ----------
     fs.writeFileSync("resume.md", resumeMarkdown);
     markdownToPDF("resume.md", "resume.pdf");
