@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import dotenv from "dotenv";
 import axios from "axios";
 import RankingSystem from "../function/rankingSys.ts";
@@ -14,7 +15,7 @@ export const githubRouter = express.Router();
 
 const token = process.env.GITHUB_TOKEN;
 
-githubRouter.get("/", async (req, res) => {
+githubRouter.post("/", async (req, res) => {
   try {
     const { username, jobDescription, resumeData } = req.body;
 
@@ -207,4 +208,16 @@ githubRouter.get("/", async (req, res) => {
       error: "Failed to generate resume",
     });
   }
+});
+
+githubRouter.get("/download", async (req, res) => {
+  const filePath = path.resolve("resume.pdf");
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "PDF not found" });
+  }
+  res.download(filePath, "gitcv-resume.pdf", (err) => {
+    if (err) {
+      console.error("Download error:", err);
+    }
+  });
 });
