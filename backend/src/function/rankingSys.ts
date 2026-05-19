@@ -9,9 +9,7 @@ dotenv.config();
 const token = process.env.GITHUB_TOKEN;
 const BATCH_SIZE = 10;
 
-const headers = {
-  Authorization: `Bearer ${token}`,
-};
+const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
 // ---------- HELPERS ----------
 
