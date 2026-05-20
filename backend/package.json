@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && prisma generate",
+    "migrate": "prisma migrate deploy",
+    "start:prod": "npm run build && npm run migrate && node dist/index.js",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
