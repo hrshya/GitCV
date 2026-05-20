@@ -19,7 +19,9 @@
     "@google/genai": "^2.3.0",
     "@prisma/client": "^7.8.0",
     "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/multer": "^2.1.0",
+    "@types/node": "^25.9.1",
     "@types/pdf-parse": "^1.1.5",
     "axios": "^1.16.0",
     "cors": "^2.8.6",
@@ -30,11 +32,10 @@
     "pdf-parse": "^2.4.5",
     "prisma": "^7.8.0",
     "puppeteer": "^25.0.2",
+    "typescript": "^6.0.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.9.1",
     "tsx": "^4.12.1"
   }
 }
