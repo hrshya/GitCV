@@ -1,8 +1,8 @@
-import type { GitHubRepo } from "../utils/gen-type.ts";
+import type { GitHubRepo } from "../utils/gen-type.js";
 import axios from "axios";
 import dotenv from "dotenv";
-import type { RankedProject } from "../utils/type.ts";
-import { generateInsights } from "./insights.ts";
+import type { RankedProject } from "../utils/type.js";
+import { generateInsights } from "./insights.js";
 
 dotenv.config();
 

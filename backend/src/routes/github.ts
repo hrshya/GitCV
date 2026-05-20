@@ -4,24 +4,24 @@ import dotenv from "dotenv";
 import axios from "axios";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
-import RankingSystem from "../function/rankingSys.ts";
-import { geminiResponse } from "../function/openAi.ts";
-import { generateMarkdownResume } from "../function/markDown.ts";
+import RankingSystem from "../function/rankingSys.js";
+import { geminiResponse } from "../function/openAi.js";
+import { generateMarkdownResume } from "../function/markDown.js";
 import fs from "fs";
-import { markdownToPDF } from "../function/generatePDF.ts";
-import { prisma } from "../db.ts";
-import { extractTextFromPdf } from "../function/pdfParser.ts";
+import { markdownToPDF } from "../function/generatePDF.js";
+import { prisma } from "../db.js";
+import { extractTextFromPdf } from "../function/pdfParser.js";
 import {
   getDownloadAnalytics,
   getUserDownloadAnalytics,
   recordResumeDownload,
-} from "../function/downloadAnalyticsStore.ts";
-import type { ResumeDownloadOwner } from "../function/downloadAnalyticsStore.ts";
+} from "../function/downloadAnalyticsStore.js";
+import type { ResumeDownloadOwner } from "../function/downloadAnalyticsStore.js";
 import {
   refundResumeGeneration,
   reserveResumeGeneration,
-} from "../function/rateLimitStore.ts";
-import type { RateLimitReservation as DailyRateLimitReservation } from "../function/rateLimitStore.ts";
+} from "../function/rateLimitStore.js";
+import type { RateLimitReservation as DailyRateLimitReservation } from "../function/rateLimitStore.js";
 
 dotenv.config();
 

@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { githubRouter } from "./routes/github.ts";
+import { githubRouter } from "./routes/github.js";
 
 dotenv.config();
 const PORT = Number(process.env.PORT || 3001);
