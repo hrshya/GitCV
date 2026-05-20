@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npm install --include=dev && npx prisma generate && tsc",
+    "build": "npm install --include=dev && npm run install:browser && npx prisma generate && tsc",
+    "install:browser": "npx puppeteer install chrome",
     "migrate": "npx prisma migrate deploy",
     "start:prod": "npm run migrate && node dist/index.js",
     "start": "node dist/index.js",
