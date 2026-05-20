@@ -5,11 +5,26 @@ import { githubRouter } from "./routes/github.js";
 
 dotenv.config();
 const PORT = Number(process.env.PORT || 3001);
+const allowedOrigins = [
+    "http://localhost:3000",
+    "https://git-cv-three.vercel.app",
+    ...(process.env.FRONTEND_URLS || "")
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+];
 
 const app = express();
 app.use(express.json());
 app.use(cors({
-    origin: "http://localhost:3000",
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+            return;
+        }
+
+        callback(new Error(`CORS blocked origin: ${origin}`));
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     exposedHeaders: [
