@@ -32,7 +32,13 @@ type BackendErrorResponse = {
 };
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001")
+    .trim()
+    .replace(/\/+$/, "");
+
+function apiUrl(path: string) {
+  return `${API_BASE}/${path.replace(/^\/+/, "")}`;
+}
 
 const steps = [
   {
@@ -108,12 +114,12 @@ export default function CreatePage() {
       let result: GenerateResumeResponse;
       if (resumePdf) {
         const response = await axios.post<GenerateResumeResponse>(
-          `${API_BASE}/api/v1/github`,
+          apiUrl("/api/v1/github"),
           buildPdfPayload()
         );
         result = response.data;
       } else {
-        const response = await axios.post<GenerateResumeResponse>(`${API_BASE}/api/v1/github`, {
+        const response = await axios.post<GenerateResumeResponse>(apiUrl("/api/v1/github"), {
           username: username.trim(),
           resumeData: resumeData.trim(),
           jobDescription: jobDescription.trim(),
@@ -147,7 +153,7 @@ export default function CreatePage() {
     }
 
     try {
-      const response = await axios.get<Blob>(`${API_BASE}/api/v1/github/download/${generatedResumeId}`, {
+      const response = await axios.get<Blob>(apiUrl(`/api/v1/github/download/${generatedResumeId}`), {
         responseType: "blob",
       });
       const blob = response.data;
