@@ -1,340 +1,308 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { toast as sonnerToast } from "sonner";
-import StepLoader from "../../components/StepLoader";
-import Toast from "../../components/Toast";
+import { FormEvent, useMemo, useState } from "react";
+import axios from "axios";
+import { Toaster, toast as notify } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 
-const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-const loaderSteps = [
-  "Fetching GitHub profile",
-  "Ranking GitHub projects",
-  "Optimizing resume",
-  "Generating preview",
+type GenerationState = "idle" | "loading" | "success" | "error";
+type GenerateResumeResponse = {
+  resumeId?: string;
+  downloadUrl?: string;
+};
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+const steps = [
+  {
+    label: "GitHub",
+    title: "Add GitHub username",
+    caption: "We use repositories as the project evidence layer.",
+  },
+  {
+    label: "Resume",
+    title: "Upload PDF or paste content",
+    caption: "Use a PDF resume or paste the current resume text.",
+  },
+  {
+    label: "Role",
+    title: "Add job context",
+    caption: "Optional, but it helps the engine select the right projects.",
+  },
 ];
 
-type PreviewData = {
-  name: string;
-  title: string;
-  contact: string;
-  summary: string;
-  skills: string[];
-  experience: Array<{ role: string; company: string; date: string; bullets: string[] }>;
-  projects: Array<{ title: string; description: string }>;
-  education: string;
-};
-
-type BackendResponsePayload = {
-  user?: { name?: string; title?: string; contact?: string };
-  overall_summary?: string;
-  skills?: string[];
-  experience?: Array<{
-    role?: string;
-    title?: string;
-    company?: string;
-    organization?: string;
-    duration?: string;
-    date?: string;
-    bullet_points?: string[];
-    bullets?: string[];
-  }>;
-  projects?: Array<{
-    project_name?: string;
-    name?: string;
-    description?: string;
-    summary?: string;
-  }>;
-  education?: Array<{
-    degree?: string;
-    title?: string;
-    institution?: string;
-  }>;
-};
-
 export default function CreatePage() {
-  const [step, setStep] = useState<"input" | "loading">("input");
-  const [activeFormStep, setActiveFormStep] = useState<1 | 2 | 3>(1);
+  const [activeStep, setActiveStep] = useState(0);
   const [username, setUsername] = useState("");
-  const [resumeInput, setResumeInput] = useState("");
-  const [jdText, setJdText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [activeStepIndex, setActiveStepIndex] = useState(0);
-  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const canContinueFromStepOne = username.trim().length > 1;
-  const canContinueFromStepTwo = resumeInput.trim().length > 20;
-  const canGenerate = username.trim().length > 1 && resumeInput.trim().length > 20;
+  const [resumeData, setResumeData] = useState("");
+  const [resumePdf, setResumePdf] = useState<File | null>(null);
+  const [jobDescription, setJobDescription] = useState("");
+  const [status, setStatus] = useState<GenerationState>("idle");
+  const [downloadReady, setDownloadReady] = useState(false);
+  const [generatedResumeId, setGeneratedResumeId] = useState("");
 
-  const getErrorMessage = (error: unknown, fallback: string) =>
-    error instanceof Error ? error.message : fallback;
+  const completion = useMemo(() => {
+    const done = [username.trim(), resumeData.trim() || resumePdf, jobDescription.trim()].filter(Boolean).length;
+    return Math.round((done / 3) * 100);
+  }, [jobDescription, resumeData, resumePdf, username]);
 
-  const submitToBackend = async () => {
+  const hasResumeInput = resumeData.trim().length > 0 || Boolean(resumePdf);
+  const canGenerate = username.trim().length > 0 && hasResumeInput;
+
+  async function submitToBackend(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (!canGenerate) {
-      setError("Please complete all steps before optimizing.");
+      notify.error("Add a GitHub username and resume content first.");
       return;
     }
 
-    setError(null);
-    sonnerToast("Starting optimization...");
-    setStep("loading");
-    setIsSubmitting(true);
-    setActiveStepIndex(0);
-
-    const interval = window.setInterval(() => {
-      setActiveStepIndex((current) => Math.min(current + 1, loaderSteps.length - 1));
-    }, 1300);
+    setStatus("loading");
+    setDownloadReady(false);
+    setGeneratedResumeId("");
 
     try {
-      const resumeData = resumeInput.trim();
-      const response = await fetch(`${backendBase}/api/v1/github`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      let result: GenerateResumeResponse;
+      if (resumePdf) {
+        const response = await axios.post<GenerateResumeResponse>(
+          `${API_BASE}/api/v1/github`,
+          buildPdfPayload()
+        );
+        result = response.data;
+      } else {
+        const response = await axios.post<GenerateResumeResponse>(`${API_BASE}/api/v1/github`, {
           username: username.trim(),
-          jobDescription: jdText.trim(),
-          resumeData,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
-        throw new Error(errorBody?.error || "Backend request failed.");
+          resumeData: resumeData.trim(),
+          jobDescription: jobDescription.trim(),
+        });
+        result = response.data;
       }
 
-      const result: { response?: BackendResponsePayload; resumeMarkdown?: string } = await response.json();
-      const responsePayload = result.response || {};
+      if (!result.resumeId) {
+        throw new Error("Generation response did not include a resume id");
+      }
 
-      const structuredPreview: PreviewData = {
-        name: responsePayload.user?.name || username || "Candidate",
-        title: responsePayload.user?.title || "Senior Software Engineer",
-        contact: responsePayload.user?.contact || `github.com/${username}`,
-        summary: responsePayload.overall_summary || "Optimized resume summary generated for your job target.",
-        skills: responsePayload.skills || ["TypeScript", "React", "Node.js", "AWS", "GraphQL"],
-        experience:
-          (responsePayload.experience || []).map((exp) => ({
-            role: exp.role || exp.title || "Software Engineer",
-            company: exp.company || exp.organization || "Company",
-            date: exp.duration || exp.date || "",
-            bullets: exp.bullet_points || exp.bullets || [],
-          })) || [],
-        projects:
-          (responsePayload.projects || []).map((project) => ({
-            title: project.project_name || project.name || "Project",
-            description: project.description || project.summary || "",
-          })) || [],
-        education:
-          (responsePayload.education || [])
-            .map((edu) => `${edu.degree || edu.title || "Degree"}, ${edu.institution || "Institution"}`)
-            .join("; ") || "Education details from your resume.",
-      };
-
-      setPreviewData(structuredPreview);
-      setStep("input");
-      sonnerToast("Optimization complete.");
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, "Unable to generate resume."));
-      setStep("input");
-    } finally {
-      window.clearInterval(interval);
-      setIsSubmitting(false);
-      setActiveStepIndex(loaderSteps.length - 1);
+      setGeneratedResumeId(result.resumeId);
+      setStatus("success");
+      setDownloadReady(true);
+      notify.success("Resume generated. PDF is ready to download.");
+    } catch {
+      setStatus("error");
+      notify.error("Could not generate the resume. Check the backend and try again.");
     }
-  };
+  }
 
-  const downloadPdf = async () => {
+  async function downloadPdf() {
+    if (!generatedResumeId) {
+      notify.error("Generate a resume before downloading.");
+      return;
+    }
+
     try {
-      const response = await fetch(`${backendBase}/api/v1/github/download`);
-      if (!response.ok) {
-        throw new Error("PDF unavailable");
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const response = await axios.get<Blob>(`${API_BASE}/api/v1/github/download/${generatedResumeId}`, {
+        responseType: "blob",
+      });
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = "gitcv-resume.pdf";
+      anchor.download = "tailored-resume.pdf";
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
-      sonnerToast("Download started.");
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, "Download failed."));
+      window.URL.revokeObjectURL(url);
+    } catch {
+      notify.error("PDF download failed. Generate the resume again and retry.");
     }
-  };
+  }
 
-  const downloadDisabled = !previewData;
+  function nextStep() {
+    setActiveStep((step) => Math.min(step + 1, steps.length - 1));
+  }
+
+  function previousStep() {
+    setActiveStep((step) => Math.max(step - 1, 0));
+  }
+
+  function buildPdfPayload() {
+    const formData = new FormData();
+    formData.append("username", username.trim());
+    formData.append("jobDescription", jobDescription.trim());
+    if (resumeData.trim()) {
+      formData.append("resumeData", resumeData.trim());
+    }
+    if (resumePdf) {
+      formData.append("resumePdf", resumePdf);
+    }
+    return formData;
+  }
 
   return (
-    <div className="create-page">
-      <div className="backdrop-aura" />
-
-      <header className="create-nav">
-        <Link className="brand-pill" href="/">
+    <main className="site create-site">
+      <header className="nav-shell shell">
+        <Link href="/" className="brand-mark" aria-label="GitCV home">
+          <span>G</span>
           GitCV
         </Link>
-        <Link className="secondary-button" href="/">
-          Back to Home
-        </Link>
+        <Button asChild variant="outline">
+          <Link href="/">Back to home</Link>
+        </Button>
       </header>
 
-      <main className="create-main">
-        <section className="create-layout">
-          <section className="create-form-surface">
-            <div className="form-head">
-              <p className="eyebrow">Create Route</p>
-              <h2>Build your resume in 3 steps</h2>
+      <section className="studio-shell shell">
+        <aside className="studio-rail">
+          <Badge variant="outline">Create route</Badge>
+          <h1>Build a role-specific resume in three calm steps</h1>
+          <p>
+            Paste the pieces you already have. GitCV will use your GitHub projects as evidence and
+            shape the final draft around the role.
+          </p>
+
+          <div className="progress-card">
+            <div>
+              <span>Input readiness</span>
+              <strong>{completion}%</strong>
             </div>
-
-            <div className="stepper-rail" aria-label="Resume creation steps">
-              {[
-                { id: 1, label: "GitHub" },
-                { id: 2, label: "Resume" },
-                { id: 3, label: "Job Description" },
-              ].map((item) => {
-                const isCompleted = activeFormStep > item.id;
-                const isActive = activeFormStep === item.id;
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveFormStep(item.id as 1 | 2 | 3)}
-                    className={`step-chip ${isCompleted ? "completed" : ""} ${isActive ? "active" : ""}`}
-                  >
-                    <span>{item.id}</span>
-                    <strong>{item.label}</strong>
-                  </button>
-                );
-              })}
+            <div className="progress-track">
+              <span style={{ width: `${completion}%` }} />
             </div>
+          </div>
 
-            <div className="form-grid">
-              {activeFormStep === 1 ? (
-                <article className="step-panel">
-                  <header>
-                    <p className="eyebrow">Step 1</p>
-                    <h3>Add GitHub username</h3>
-                  </header>
-                  <label className="field-group">
-                    <span>GitHub Username</span>
-                    <input
-                      value={username}
-                      onChange={(event) => setUsername(event.target.value)}
-                      placeholder="janedoe"
-                    />
-                  </label>
-                  <div className="panel-actions single">
-                    <button
-                      type="button"
-                      className="primary-button"
-                      disabled={!canContinueFromStepOne}
-                      onClick={() => setActiveFormStep(2)}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </article>
-              ) : null}
+          <div className="step-list" aria-label="Resume generation steps">
+            {steps.map((step, index) => {
+              const isComplete =
+                (index === 0 && username.trim()) ||
+                (index === 1 && hasResumeInput) ||
+                (index === 2 && jobDescription.trim());
 
-              {activeFormStep === 2 ? (
-                <article className="step-panel">
-                  <header>
-                    <p className="eyebrow">Step 2</p>
-                    <h3>Paste your resume</h3>
-                  </header>
-                  <label className="field-group">
-                    <span>Resume Content</span>
-                    <textarea
-                      value={resumeInput}
-                      onChange={(event) => setResumeInput(event.target.value)}
-                      placeholder="Paste your resume text..."
-                    />
-                  </label>
-                  <p className="step-helper">{resumeInput.length} characters</p>
-                  <div className="panel-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => setActiveFormStep(1)}
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      className="primary-button"
-                      disabled={!canContinueFromStepTwo}
-                      onClick={() => setActiveFormStep(3)}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </article>
-              ) : null}
-
-              {activeFormStep === 3 ? (
-                <article className="step-panel">
-                  <header>
-                    <p className="eyebrow">Step 3</p>
-                    <h3>Paste job description (optional)</h3>
-                  </header>
-                  <label className="field-group">
-                    <span>Job Description (Optional)</span>
-                    <textarea
-                      value={jdText}
-                      onChange={(event) => setJdText(event.target.value)}
-                      placeholder="Paste the job description (or leave empty)..."
-                    />
-                  </label>
-                  <p className="step-helper">{jdText.length} characters (optional)</p>
-                  <div className="panel-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => setActiveFormStep(2)}
-                    >
-                      Back
-                    </button>
-                    <button
-                      onClick={submitToBackend}
-                      disabled={isSubmitting || !canGenerate}
-                      className="primary-button"
-                    >
-                      {isSubmitting ? "Generating..." : "Generate Resume"}
-                    </button>
-                  </div>
-                </article>
-              ) : null}
-
-              <div className="create-actions">
+              return (
                 <button
-                  onClick={downloadPdf}
-                  disabled={downloadDisabled}
-                  className="secondary-button full-width"
+                  className={activeStep === index ? "step-button active" : "step-button"}
+                  key={step.label}
+                  onClick={() => setActiveStep(index)}
+                  type="button"
                 >
-                  Download PDF
+                  <span>{isComplete ? "OK" : index + 1}</span>
+                  <div>
+                    <strong>{step.label}</strong>
+                    <small>{step.caption}</small>
+                  </div>
                 </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <form className="studio-form" onSubmit={submitToBackend}>
+          <Card className="form-card">
+            <CardHeader>
+              <Badge variant="outline">{`Step ${activeStep + 1}`}</Badge>
+              <CardTitle>{steps[activeStep].title}</CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              {activeStep === 0 && (
+                <div className="field-stack">
+                  <label htmlFor="username">GitHub username</label>
+                  <Input
+                    autoFocus
+                    id="username"
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder="vasu-devs"
+                    value={username}
+                  />
+                  <p>Use the public username whose repositories should be analyzed.</p>
+                </div>
+              )}
+
+              {activeStep === 1 && (
+                <div className="field-stack">
+                  <label htmlFor="resumePdf">Resume PDF</label>
+                  <Input
+                    accept="application/pdf,.pdf"
+                    id="resumePdf"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] || null;
+                      const isPdf =
+                        file &&
+                        (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"));
+                      if (file && !isPdf) {
+                        notify.error("Please select a PDF resume.");
+                        event.target.value = "";
+                        setResumePdf(null);
+                        return;
+                      }
+                      setResumePdf(file);
+                    }}
+                    type="file"
+                  />
+                  <p>{resumePdf ? resumePdf.name : "Upload a PDF resume, or paste the text below instead."}</p>
+
+                  <label htmlFor="resume">Resume content</label>
+                  <Textarea
+                    id="resume"
+                    onChange={(event) => setResumeData(event.target.value)}
+                    placeholder="Optional if you uploaded a PDF. Paste resume text here as a fallback..."
+                    rows={14}
+                    value={resumeData}
+                  />
+                  <p>When a PDF is uploaded, the backend extracts its text and sends that string through the pipeline.</p>
+                </div>
+              )}
+
+              {activeStep === 2 && (
+                <div className="field-stack">
+                  <div className="label-row">
+                    <label htmlFor="jobDescription">Job description</label>
+                    <Badge variant="outline">Optional</Badge>
+                  </div>
+                  <Textarea
+                    id="jobDescription"
+                    onChange={(event) => setJobDescription(event.target.value)}
+                    placeholder="Paste the role description when you want stronger project matching..."
+                    rows={14}
+                    value={jobDescription}
+                  />
+                  <p>Leave this blank to generate from your GitHub and resume alone.</p>
+                </div>
+              )}
+
+              <div className="form-actions">
+                <Button disabled={activeStep === 0 || status === "loading"} onClick={previousStep} type="button" variant="outline">
+                  Back
+                </Button>
+                {activeStep < steps.length - 1 ? (
+                  <Button onClick={nextStep} type="button">
+                    Continue
+                  </Button>
+                ) : (
+                  <ShimmerButton disabled={!canGenerate || status === "loading"} type="submit">
+                    {status === "loading" ? "Generating..." : "Generate Resume"}
+                  </ShimmerButton>
+                )}
               </div>
 
-              {error ? <p className="form-error">{error}</p> : null}
+              <Button
+                className="download-button"
+                disabled={!downloadReady}
+                onClick={downloadPdf}
+                type="button"
+                variant="outline"
+              >
+                Download PDF
+              </Button>
+            </CardContent>
+          </Card>
+        </form>
+      </section>
 
-              {previewData ? (
-                <div className="result-strip">
-                  <span>Resume draft generated for {previewData.name}</span>
-                  <button onClick={downloadPdf}>Download latest PDF</button>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        </section>
-
-        {step === "loading" ? <StepLoader steps={loaderSteps} activeIndex={activeStepIndex} /> : null}
-
-      </main>
-
-      <Toast />
-    </div>
+      <Toaster position="bottom-right" richColors />
+    </main>
   );
 }

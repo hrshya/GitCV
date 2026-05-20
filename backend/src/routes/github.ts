@@ -2,12 +2,15 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import axios from "axios";
+import multer from "multer";
+import { randomUUID } from "node:crypto";
 import RankingSystem from "../function/rankingSys.ts";
 import { geminiResponse } from "../function/openAi.ts";
 import { generateMarkdownResume } from "../function/markDown.ts";
 import fs from "fs";
 import { markdownToPDF } from "../function/generatePDF.ts";
 import { prisma } from "../db.ts";
+import { extractTextFromPdf } from "../function/pdfParser.ts";
 
 dotenv.config();
 
@@ -15,13 +18,124 @@ export const githubRouter = express.Router();
 
 const token = process.env.GITHUB_TOKEN;
 const githubHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
+const generatedResumeRoot = path.resolve("generated", "resumes");
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 8 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, callback) => {
+    const isPdf =
+      file.mimetype === "application/pdf" ||
+      file.originalname.toLowerCase().endsWith(".pdf");
 
-githubRouter.post("/", async (req, res) => {
+    if (!isPdf) {
+      callback(new Error("Resume upload must be a PDF file"));
+      return;
+    }
+
+    callback(null, true);
+  },
+});
+
+type UploadedFile = {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+};
+
+function getStringInput(value: unknown): string {
+  if (Array.isArray(value)) {
+    return getStringInput(value[0]);
+  }
+
+  return typeof value === "string" ? value : "";
+}
+
+function getUploadedResumeFile(req: express.Request): UploadedFile | undefined {
+  const files = req.files as Record<string, UploadedFile[] | undefined> | undefined;
+
+  return files?.resumePdf?.[0] || files?.resume?.[0] || files?.resumeFile?.[0];
+}
+
+function getResumePaths(resumeId: string) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(resumeId)) {
+    throw new Error("Invalid resume id");
+  }
+
+  const resumeDir = path.resolve(generatedResumeRoot, resumeId);
+  if (!resumeDir.startsWith(generatedResumeRoot)) {
+    throw new Error("Invalid resume output path");
+  }
+
+  return {
+    resumeDir,
+    markdownPath: path.join(resumeDir, "resume.md"),
+    pdfPath: path.join(resumeDir, "resume.pdf"),
+  };
+}
+
+function downloadResumeById(resumeId: string, res: express.Response) {
   try {
-    const { username, jobDescription, resumeData } = req.body;
+    const { pdfPath } = getResumePaths(resumeId);
+
+    if (!fs.existsSync(pdfPath)) {
+      return res.status(404).json({ error: "PDF not found" });
+    }
+
+    return res.download(pdfPath, `gitcv-resume-${resumeId}.pdf`, (err) => {
+      if (err) {
+        console.error("Download error:", err);
+      }
+    });
+  } catch {
+    return res.status(400).json({ error: "Invalid resume id" });
+  }
+}
+
+function handleResumeUpload(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const middleware = upload.fields([
+    { name: "resumePdf", maxCount: 1 },
+    { name: "resume", maxCount: 1 },
+    { name: "resumeFile", maxCount: 1 },
+  ]);
+
+  middleware(req, res, (error) => {
+    if (!error) {
+      next();
+      return;
+    }
+
+    const message =
+      error instanceof multer.MulterError
+        ? error.code === "LIMIT_FILE_SIZE"
+          ? "Resume PDF must be smaller than 8MB"
+          : error.message
+        : error instanceof Error
+          ? error.message
+          : "Invalid resume upload";
+
+    res.status(400).json({ error: message });
+  });
+}
+
+githubRouter.post("/", handleResumeUpload, async (req, res) => {
+  try {
+    const username = getStringInput(req.body.username).trim();
+    const jobDescription = getStringInput(req.body.jobDescription);
+    const resumePdf = getUploadedResumeFile(req);
+    let resumeData = getStringInput(req.body.resumeData);
 
     if (!username) {
       return res.status(400).json({ error: "Username is required" });
+    }
+
+    if (resumePdf) {
+      resumeData = await extractTextFromPdf(resumePdf.buffer);
     }
 
     // ---------- GITHUB FETCH ----------
@@ -252,12 +366,22 @@ githubRouter.post("/", async (req, res) => {
       achievements: response?.achievements || [],
     });
 
+    // ---------- SAVE FILE ----------
+    const resumeId = randomUUID();
+    const { resumeDir, markdownPath, pdfPath } = getResumePaths(resumeId);
+    fs.mkdirSync(resumeDir, { recursive: true });
+    fs.writeFileSync(markdownPath, resumeMarkdown);
+    await markdownToPDF(markdownPath, pdfPath);
+    const downloadUrl = `/api/v1/github/download/${resumeId}`;
+
     if (user?.id) {
       try {
         await prisma.resume.create({
           data: {
+            id: resumeId,
             userId: user.id,
             markdown: resumeMarkdown,
+            resumeUrl: downloadUrl,
           },
         });
       } catch (resumeErr) {
@@ -265,13 +389,11 @@ githubRouter.post("/", async (req, res) => {
       }
     }
 
-    // ---------- SAVE FILE ----------
-    fs.writeFileSync("resume.md", resumeMarkdown);
-    markdownToPDF("resume.md", "resume.pdf");
-
     res.json({
       response,
       resumeMarkdown,
+      resumeId,
+      downloadUrl,
     });
   } catch (error: any) {
     console.error(error.message);
@@ -282,14 +404,15 @@ githubRouter.post("/", async (req, res) => {
   }
 });
 
+githubRouter.get("/download/:resumeId", async (req, res) => {
+  return downloadResumeById(req.params.resumeId, res);
+});
+
 githubRouter.get("/download", async (req, res) => {
-  const filePath = path.resolve("resume.pdf");
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: "PDF not found" });
+  const resumeId = getStringInput(req.query.resumeId);
+  if (!resumeId) {
+    return res.status(400).json({ error: "resumeId is required" });
   }
-  res.download(filePath, "gitcv-resume.pdf", (err) => {
-    if (err) {
-      console.error("Download error:", err);
-    }
-  });
+
+  return downloadResumeById(resumeId, res);
 });
