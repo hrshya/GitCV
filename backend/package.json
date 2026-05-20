@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc && prisma generate",
-    "migrate": "prisma migrate deploy",
+    "build": "tsc && npx prisma generate",
+    "migrate": "npx prisma migrate deploy",
     "start:prod": "npm run build && npm run migrate && node dist/index.js",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
     "tsx": "^4.12.1"
   }
 }

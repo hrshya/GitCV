@@ -113,8 +113,9 @@ function getSafeResumeFileName(name: unknown): string {
 function getClientIp(req: express.Request): string {
   const forwardedFor = req.headers["x-forwarded-for"];
   const forwardedValue = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-  const rawIp = forwardedValue || req.ip || req.socket.remoteAddress || "unknown";
+  const rawIp: string = (forwardedValue || req.ip || req.socket.remoteAddress || "unknown") as string;
 
+  // @ts-ignore
   return rawIp.split(",")[0].trim().replace(/^::ffff:/, "") || "unknown";
 }
 
@@ -166,9 +167,9 @@ async function getResumeDownloadOwner(resumeId: string): Promise<ResumeDownloadO
   if (metadata) {
     return {
       githubUsername: metadata.githubUsername,
-      name: metadata.name,
+      name: metadata.name ?? null,
       resumeId,
-      userId: metadata.userId,
+      userId: metadata.userId ?? null,
     };
   }
 
@@ -185,9 +186,9 @@ async function getResumeDownloadOwner(resumeId: string): Promise<ResumeDownloadO
     if (resume?.user) {
       return {
         githubUsername: resume.user.githubUsername || "unknown",
-        name: resume.user.name,
+        name: resume.user.name ?? null,
         resumeId,
-        userId: resume.user.id,
+        userId: resume.user.id ?? null,
       };
     }
   } catch (dbErr) {
