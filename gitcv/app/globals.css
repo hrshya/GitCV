@@ -1593,6 +1593,104 @@ button:disabled {
   margin-top: 14px;
 }
 
+.smart-loader {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fffefa;
+  padding: 16px;
+}
+
+.smart-loader-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.smart-loader-head span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.smart-loader-head strong {
+  color: var(--black);
+  font-size: 0.94rem;
+  font-weight: 850;
+  text-align: right;
+}
+
+.smart-loader-progress {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eee9e2;
+}
+
+.smart-loader-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--black);
+  transition: width 320ms ease;
+}
+
+.smart-loader-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.smart-loader-step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  opacity: 0.5;
+  transition: color 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.smart-loader-step span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: inherit;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.smart-loader-step p {
+  margin: 0;
+  color: inherit;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.smart-loader-step.active {
+  color: var(--black);
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+.smart-loader-step.active span {
+  border-color: var(--black);
+  background: var(--black);
+  color: #ffffff;
+}
+
+.smart-loader-step.complete {
+  color: var(--black);
+  opacity: 0.82;
+}
+
 .inline-loader {
   display: grid;
   gap: 14px;
@@ -2876,6 +2974,7 @@ body {
 .create-site .studio-form > .form-card,
 .create-site .progress-card,
 .create-site .step-button,
+.create-site .smart-loader,
 .create-site .inline-loader {
   border-color: var(--mono-line) !important;
   background: var(--mono-ivory) !important;
@@ -2885,6 +2984,7 @@ body {
 
 .create-site .brand-mark span,
 .create-site .progress-track span,
+.create-site .smart-loader-progress span,
 .create-site .loader-pulse span {
   background: var(--mono-ink) !important;
 }
@@ -2896,6 +2996,18 @@ body {
 
 .create-site .progress-track {
   background: var(--mono-line) !important;
+}
+
+.create-site .smart-loader-progress,
+.create-site .smart-loader-step span {
+  border-color: var(--mono-line) !important;
+  background: var(--mono-faint) !important;
+}
+
+.create-site .smart-loader-step.active span {
+  border-color: var(--mono-ink) !important;
+  background: var(--mono-ink) !important;
+  color: var(--mono-ivory);
 }
 
 .create-site input,
