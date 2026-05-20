@@ -15,6 +15,7 @@ const prismaFallback = {
   },
   resume: {
     create: async () => null,
+    findUnique: async () => null,
   },
 };
 

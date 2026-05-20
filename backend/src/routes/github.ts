@@ -11,6 +11,17 @@ import fs from "fs";
 import { markdownToPDF } from "../function/generatePDF.ts";
 import { prisma } from "../db.ts";
 import { extractTextFromPdf } from "../function/pdfParser.ts";
+import {
+  getDownloadAnalytics,
+  getUserDownloadAnalytics,
+  recordResumeDownload,
+} from "../function/downloadAnalyticsStore.ts";
+import type { ResumeDownloadOwner } from "../function/downloadAnalyticsStore.ts";
+import {
+  refundResumeGeneration,
+  reserveResumeGeneration,
+} from "../function/rateLimitStore.ts";
+import type { RateLimitReservation as DailyRateLimitReservation } from "../function/rateLimitStore.ts";
 
 dotenv.config();
 
@@ -44,6 +55,20 @@ type UploadedFile = {
   mimetype: string;
 };
 
+type RateLimitSubject = {
+  key: string;
+  label: string;
+};
+
+type RateLimitReservation = {
+  result: DailyRateLimitReservation;
+  subject: RateLimitSubject;
+};
+
+type ResumeMetadata = ResumeDownloadOwner & {
+  createdAt: string;
+};
+
 function getStringInput(value: unknown): string {
   if (Array.isArray(value)) {
     return getStringInput(value[0]);
@@ -70,12 +95,114 @@ function getResumePaths(resumeId: string) {
 
   return {
     resumeDir,
+    metadataPath: path.join(resumeDir, "metadata.json"),
     markdownPath: path.join(resumeDir, "resume.md"),
     pdfPath: path.join(resumeDir, "resume.pdf"),
   };
 }
 
-function downloadResumeById(resumeId: string, res: express.Response) {
+function getSafeResumeFileName(name: unknown): string {
+  const rawName = typeof name === "string" ? name.trim() : "";
+  const safeName = rawName
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return `${safeName || "Candidate"}_Resume.pdf`;
+}
+
+function getClientIp(req: express.Request): string {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  const forwardedValue = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+  const rawIp = forwardedValue || req.ip || req.socket.remoteAddress || "unknown";
+
+  return rawIp.split(",")[0].trim().replace(/^::ffff:/, "") || "unknown";
+}
+
+function getRateLimitSubjects(req: express.Request, username: string): RateLimitSubject[] {
+  return [
+    {
+      key: `github:${username.toLowerCase()}`,
+      label: "GitHub username",
+    },
+    {
+      key: `ip:${getClientIp(req)}`,
+      label: "IP address",
+    },
+  ];
+}
+
+function refundReservations(reservations: RateLimitReservation[]) {
+  for (const reservation of reservations) {
+    if (reservation.result.reserved) {
+      refundResumeGeneration(reservation.subject.key);
+    }
+  }
+}
+
+function writeResumeMetadata(metadata: ResumeMetadata) {
+  const { metadataPath, resumeDir } = getResumePaths(metadata.resumeId);
+  fs.mkdirSync(resumeDir, { recursive: true });
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+}
+
+function readResumeMetadata(resumeId: string): ResumeMetadata | null {
+  try {
+    const { metadataPath } = getResumePaths(resumeId);
+
+    if (!fs.existsSync(metadataPath)) {
+      return null;
+    }
+
+    return JSON.parse(fs.readFileSync(metadataPath, "utf8")) as ResumeMetadata;
+  } catch (error) {
+    console.error("Resume metadata read failed:", error);
+    return null;
+  }
+}
+
+async function getResumeDownloadOwner(resumeId: string): Promise<ResumeDownloadOwner> {
+  const metadata = readResumeMetadata(resumeId);
+
+  if (metadata) {
+    return {
+      githubUsername: metadata.githubUsername,
+      name: metadata.name,
+      resumeId,
+      userId: metadata.userId,
+    };
+  }
+
+  try {
+    const resume = await prisma.resume.findUnique({
+      where: {
+        id: resumeId,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (resume?.user) {
+      return {
+        githubUsername: resume.user.githubUsername || "unknown",
+        name: resume.user.name,
+        resumeId,
+        userId: resume.user.id,
+      };
+    }
+  } catch (dbErr) {
+    console.error("Prisma resume owner lookup failed:", dbErr);
+  }
+
+  return {
+    githubUsername: "unknown",
+    name: null,
+    resumeId,
+    userId: null,
+  };
+}
+
+async function downloadResumeById(resumeId: string, res: express.Response) {
   try {
     const { pdfPath } = getResumePaths(resumeId);
 
@@ -83,7 +210,15 @@ function downloadResumeById(resumeId: string, res: express.Response) {
       return res.status(404).json({ error: "PDF not found" });
     }
 
-    return res.download(pdfPath, `gitcv-resume-${resumeId}.pdf`, (err) => {
+    const owner = await getResumeDownloadOwner(resumeId);
+    const downloadStats = recordResumeDownload(owner);
+    const downloadName = getSafeResumeFileName(owner.name);
+
+    res.setHeader("X-Resume-Download-Count", String(downloadStats.resumeDownloads));
+    res.setHeader("X-User-Resume-Download-Count", String(downloadStats.userDownloads));
+    res.setHeader("X-Total-Resume-Downloads", String(downloadStats.totalDownloads));
+
+    return res.download(pdfPath, downloadName, (err) => {
       if (err) {
         console.error("Download error:", err);
       }
@@ -124,6 +259,9 @@ function handleResumeUpload(
 }
 
 githubRouter.post("/", handleResumeUpload, async (req, res) => {
+  const reservations: RateLimitReservation[] = [];
+  let generationCompleted = false;
+
   try {
     const username = getStringInput(req.body.username).trim();
     const jobDescription = getStringInput(req.body.jobDescription);
@@ -132,6 +270,26 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
 
     if (!username) {
       return res.status(400).json({ error: "Username is required" });
+    }
+
+    for (const subject of getRateLimitSubjects(req, username)) {
+      const result = reserveResumeGeneration(subject.key);
+
+      if (!result.allowed) {
+        refundReservations(reservations);
+        return res.status(429).json({
+          error: `Daily resume generation limit reached for this ${subject.label}. Try again after the daily reset.`,
+          limit: result.limit,
+          remainingToday: result.remaining,
+          resetAt: result.resetAt,
+          usedToday: result.count,
+        });
+      }
+
+      reservations.push({
+        result,
+        subject,
+      });
     }
 
     if (resumePdf) {
@@ -373,6 +531,13 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
     fs.writeFileSync(markdownPath, resumeMarkdown);
     await markdownToPDF(markdownPath, pdfPath);
     const downloadUrl = `/api/v1/github/download/${resumeId}`;
+    writeResumeMetadata({
+      createdAt: new Date().toISOString(),
+      githubUsername: username,
+      name: response?.user?.name || userResponse?.data?.name || username,
+      resumeId,
+      userId: user?.id || null,
+    });
 
     if (user?.id) {
       try {
@@ -389,19 +554,46 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
       }
     }
 
+    generationCompleted = true;
+    const generationUsage = reservations.reduce(
+      (usage, reservation) => ({
+        dailyLimit: reservation.result.limit,
+        remainingToday: Math.min(usage.remainingToday, reservation.result.remaining),
+        resetAt: reservation.result.resetAt,
+      }),
+      {
+        dailyLimit: reservations[0]?.result.limit || 5,
+        remainingToday: reservations[0]?.result.remaining || 0,
+        resetAt: reservations[0]?.result.resetAt || null,
+      }
+    );
+
     res.json({
       response,
       resumeMarkdown,
       resumeId,
       downloadUrl,
+      usage: generationUsage,
     });
   } catch (error: any) {
+    if (!generationCompleted) {
+      refundReservations(reservations);
+    }
+
     console.error(error.message);
 
     res.status(500).json({
       error: "Failed to generate resume",
     });
   }
+});
+
+githubRouter.get("/analytics/downloads", (_req, res) => {
+  return res.json(getDownloadAnalytics());
+});
+
+githubRouter.get("/analytics/downloads/users/:githubUsername", (req, res) => {
+  return res.json(getUserDownloadAnalytics(getStringInput(req.params.githubUsername)));
 });
 
 githubRouter.get("/download/:resumeId", async (req, res) => {

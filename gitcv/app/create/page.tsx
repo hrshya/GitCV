@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Toaster, toast as notify } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +13,22 @@ import { ShimmerButton } from "@/components/magicui/shimmer-button";
 
 type GenerationState = "idle" | "loading" | "success" | "error";
 type GenerateResumeResponse = {
+  response?: {
+    user?: {
+      name?: string;
+    };
+  };
   resumeId?: string;
   downloadUrl?: string;
+  usage?: {
+    dailyLimit?: number;
+    remainingToday?: number;
+    resetAt?: string | null;
+  };
+};
+
+type BackendErrorResponse = {
+  error?: string;
 };
 
 const API_BASE =
@@ -38,6 +52,13 @@ const steps = [
   },
 ];
 
+const loadingSteps = [
+  "Analyzing repositories...",
+  "Ranking projects...",
+  "Generating resume...",
+  "Refining for recruiters...",
+];
+
 export default function CreatePage() {
   const [activeStep, setActiveStep] = useState(0);
   const [username, setUsername] = useState("");
@@ -45,8 +66,10 @@ export default function CreatePage() {
   const [resumePdf, setResumePdf] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState("");
   const [status, setStatus] = useState<GenerationState>("idle");
+  const [loadingStepIndex, setLoadingStepIndex] = useState(0);
   const [downloadReady, setDownloadReady] = useState(false);
   const [generatedResumeId, setGeneratedResumeId] = useState("");
+  const [downloadFileName, setDownloadFileName] = useState("Candidate_Resume.pdf");
 
   const completion = useMemo(() => {
     const done = [username.trim(), resumeData.trim() || resumePdf, jobDescription.trim()].filter(Boolean).length;
@@ -56,6 +79,18 @@ export default function CreatePage() {
   const hasResumeInput = resumeData.trim().length > 0 || Boolean(resumePdf);
   const canGenerate = username.trim().length > 0 && hasResumeInput;
 
+  useEffect(() => {
+    if (status !== "loading") {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setLoadingStepIndex((index) => Math.min(index + 1, loadingSteps.length - 1));
+    }, 1400);
+
+    return () => window.clearInterval(interval);
+  }, [status]);
+
   async function submitToBackend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canGenerate) {
@@ -64,8 +99,10 @@ export default function CreatePage() {
     }
 
     setStatus("loading");
+    setLoadingStepIndex(0);
     setDownloadReady(false);
     setGeneratedResumeId("");
+    setDownloadFileName("Candidate_Resume.pdf");
 
     try {
       let result: GenerateResumeResponse;
@@ -89,12 +126,17 @@ export default function CreatePage() {
       }
 
       setGeneratedResumeId(result.resumeId);
+      setDownloadFileName(getResumeFileName(result.response?.user?.name));
       setStatus("success");
       setDownloadReady(true);
-      notify.success("Resume generated. PDF is ready to download.");
-    } catch {
+      notify.success(
+        typeof result.usage?.remainingToday === "number"
+          ? `Resume generated. ${result.usage.remainingToday} generations left today.`
+          : "Resume generated. PDF is ready to download."
+      );
+    } catch (error) {
       setStatus("error");
-      notify.error("Could not generate the resume. Check the backend and try again.");
+      notify.error(getBackendErrorMessage(error, "Could not generate the resume. Check the backend and try again."));
     }
   }
 
@@ -112,11 +154,12 @@ export default function CreatePage() {
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = "tailored-resume.pdf";
+      anchor.download = downloadFileName;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       window.URL.revokeObjectURL(url);
+      notify.success("PDF download started.");
     } catch {
       notify.error("PDF download failed. Generate the resume again and retry.");
     }
@@ -141,6 +184,23 @@ export default function CreatePage() {
       formData.append("resumePdf", resumePdf);
     }
     return formData;
+  }
+
+  function getResumeFileName(name?: string) {
+    const safeName = (name || "Candidate")
+      .trim()
+      .replace(/[^\p{L}\p{N}]+/gu, "_")
+      .replace(/^_+|_+$/g, "");
+
+    return `${safeName || "Candidate"}_Resume.pdf`;
+  }
+
+  function getBackendErrorMessage(error: unknown, fallback: string) {
+    if (axios.isAxiosError<BackendErrorResponse>(error)) {
+      return error.response?.data?.error || fallback;
+    }
+
+    return fallback;
   }
 
   return (
@@ -273,6 +333,35 @@ export default function CreatePage() {
                 </div>
               )}
 
+              {status === "loading" && (
+                <div className="smart-loader" role="status" aria-live="polite">
+                  <div className="smart-loader-head">
+                    <span>Generation pipeline</span>
+                    <strong>{loadingSteps[loadingStepIndex]}</strong>
+                  </div>
+                  <div className="smart-loader-progress" aria-hidden="true">
+                    <span style={{ width: `${((loadingStepIndex + 1) / loadingSteps.length) * 100}%` }} />
+                  </div>
+                  <div className="smart-loader-steps">
+                    {loadingSteps.map((step, index) => (
+                      <div
+                        className={
+                          index < loadingStepIndex
+                            ? "smart-loader-step complete"
+                            : index === loadingStepIndex
+                              ? "smart-loader-step active"
+                              : "smart-loader-step"
+                        }
+                        key={step}
+                      >
+                        <span>{String(index + 1).padStart(2, "0")}</span>
+                        <p>{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="form-actions">
                 <Button disabled={activeStep === 0 || status === "loading"} onClick={previousStep} type="button" variant="outline">
                   Back
@@ -283,14 +372,14 @@ export default function CreatePage() {
                   </Button>
                 ) : (
                   <ShimmerButton disabled={!canGenerate || status === "loading"} type="submit">
-                    {status === "loading" ? "Generating..." : "Generate Resume"}
+                    {status === "loading" ? "Working..." : "Generate Resume"}
                   </ShimmerButton>
                 )}
               </div>
 
               <Button
                 className="download-button"
-                disabled={!downloadReady}
+                disabled={!downloadReady || status === "loading"}
                 onClick={downloadPdf}
                 type="button"
                 variant="outline"

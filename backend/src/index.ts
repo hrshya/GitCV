@@ -12,6 +12,11 @@ app.use(cors({
     origin: "http://localhost:3000",
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: [
+        "X-Resume-Download-Count",
+        "X-Total-Resume-Downloads",
+        "X-User-Resume-Download-Count",
+    ],
 }));
 
 app.use('/api/v1/github', githubRouter);

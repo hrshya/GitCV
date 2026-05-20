@@ -41,7 +41,7 @@ export function generateMarkdownResume(data: {
     achievements,
   } = data;
 
-  let md = `#<p align="center"> ${name}\n</p>\n`;
+  let md = `# <p align="center"> ${name}</p>\n`;
 
   if (contact) {
     md += `<p align="center">${contact}</p>\n`;
