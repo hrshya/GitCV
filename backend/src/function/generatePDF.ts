@@ -2,6 +2,20 @@ import puppeteer from "puppeteer";
 import { marked } from "marked";
 import fs from "fs";
 
+const localBravePath = "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe";
+
+function getBrowserLaunchOptions() {
+  const executablePath =
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    (fs.existsSync(localBravePath) ? localBravePath : undefined);
+
+  return {
+    ...(executablePath ? { executablePath } : {}),
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    headless: true,
+  };
+}
+
 export async function markdownToPDF(mdPath: string, outputPath: string) {
   const markdown = fs.readFileSync(mdPath, "utf-8");
 
@@ -87,9 +101,7 @@ export async function markdownToPDF(mdPath: string, outputPath: string) {
     </html>
 `;
 
-  const browser = await puppeteer.launch({
-    executablePath: "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
-  });
+  const browser = await puppeteer.launch(getBrowserLaunchOptions());
   const page = await browser.newPage();
 
   await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
