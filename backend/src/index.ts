@@ -22,8 +22,17 @@ app.use(cors({
 app.use('/api/v1/github', githubRouter);
 // app.use('/api/v1/product', productRouter);
 
-app.get("/", async (req, res) => {
-    
+app.get("/", (_req, res) => {
+    res.status(200).json({
+        service: "GitCV backend",
+        status: "ok",
+    });
+});
+
+app.get("/health", (_req, res) => {
+    res.status(200).json({
+        status: "ok",
+    });
 });
 
 app.listen(PORT, () => {
