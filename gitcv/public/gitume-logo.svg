@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 188 48" role="img" aria-label="Gitume logo">
+  <rect x="4" y="4" width="40" height="40" rx="13" fill="#17130f"/>
+  <path d="M30.25 15.9h-8.8a8.1 8.1 0 1 0 0 16.2h7.2a5.7 5.7 0 0 0 0-11.4h-5.1" fill="none" stroke="#f4efe6" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M28.8 20.35 35.15 14" fill="none" stroke="#f4efe6" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M28.8 27.65 35.15 34" fill="none" stroke="#f4efe6" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="35.15" cy="14" r="2.9" fill="#f4efe6"/>
+  <circle cx="35.15" cy="34" r="2.9" fill="#f4efe6"/>
+  <text x="58" y="31.5" fill="#17130f" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="800" letter-spacing="-.2">Gitume</text>
+</svg>

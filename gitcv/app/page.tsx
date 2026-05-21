@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GitumeLogo } from "@/components/GitumeLogo";
 import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 
@@ -75,7 +76,7 @@ export default function Home() {
     <main className="mono-site">
       <header className="mono-nav mono-shell">
         <Link className="mono-brand" href="/" aria-label="Gitume home">
-          Gitume
+          <GitumeLogo />
         </Link>
         <nav aria-label="Primary navigation">
           <a href="#selection">Selection</a>

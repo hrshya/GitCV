@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Toaster, toast as notify } from "sonner";
+import { GitumeLogo } from "@/components/GitumeLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -230,8 +231,7 @@ export default function CreatePage() {
     <main className="site create-site">
       <header className="nav-shell shell">
         <Link href="/" className="brand-mark" aria-label="Gitume home">
-          <span>G</span>
-          Gitume
+          <GitumeLogo />
         </Link>
         <Button asChild variant="outline">
           <Link href="/">Back to home</Link>

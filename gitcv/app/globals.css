@@ -97,7 +97,6 @@ button:disabled {
 .brand-mark {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
   width: fit-content;
   min-height: 42px;
   border: 1px solid var(--border-strong);
@@ -107,15 +106,42 @@ button:disabled {
   font-weight: 700;
 }
 
-.brand-mark span {
-  display: grid;
+.gitume-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  line-height: 1;
+}
+
+.gitume-logo-mark {
   width: 30px;
   height: 30px;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--black);
-  color: #ffffff;
-  font-size: 0.9rem;
+  flex: 0 0 auto;
+  color: var(--black);
+}
+
+.gitume-logo-plate {
+  fill: currentColor;
+}
+
+.gitume-logo-line {
+  fill: none;
+  stroke: var(--logo-cut, #ffffff);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.gitume-logo-dot {
+  fill: var(--logo-cut, #ffffff);
+}
+
+.gitume-logo-word {
+  color: inherit;
+  font-size: 0.96rem;
+  font-weight: 850;
+  letter-spacing: 0;
 }
 
 .nav-links {
@@ -1965,15 +1991,16 @@ body {
 }
 
 .mono-brand {
-  display: inline-grid;
+  display: inline-flex;
+  align-items: center;
   min-height: 42px;
-  place-items: center;
   border: 1px solid var(--mono-line-strong);
   border-radius: 999px;
   background: var(--mono-ivory);
-  padding: 0 18px;
+  padding: 6px 16px 6px 7px;
   color: var(--mono-ink);
   font-weight: 850;
+  --logo-cut: var(--mono-ivory);
 }
 
 .mono-nav nav {
@@ -2982,11 +3009,18 @@ body {
   box-shadow: none;
 }
 
-.create-site .brand-mark span,
 .create-site .progress-track span,
 .create-site .smart-loader-progress span,
 .create-site .loader-pulse span {
   background: var(--mono-ink) !important;
+}
+
+.create-site .brand-mark {
+  --logo-cut: var(--mono-ivory);
+}
+
+.create-site .brand-mark .gitume-logo-mark {
+  color: var(--mono-ink);
 }
 
 .create-site .step-button.active {

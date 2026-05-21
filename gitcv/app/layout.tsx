@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "Gitume - AI resume optimizer",
   description:
     "Upload your resume, paste a job description, and generate a tailored ATS-friendly resume using your most relevant projects.",
+  icons: {
+    icon: "/gitume-mark.svg",
+  },
 };
 
 export default function RootLayout({
