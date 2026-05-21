@@ -297,7 +297,7 @@ export default function CreatePage() {
                     autoFocus
                     id="username"
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder="vasu-devs"
+                    placeholder="your-github-username"
                     value={username}
                   />
                   <p>Use the public username whose repositories should be analyzed.</p>
