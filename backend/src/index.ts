@@ -7,7 +7,7 @@ dotenv.config();
 const PORT = Number(process.env.PORT || 3001);
 const allowedOrigins = [
     "http://localhost:3000",
-    "https://githume.vercel.app",
+    "https://gitume.vercel.app",
     ...(process.env.FRONTEND_URLS || "")
         .split(",")
         .map((origin) => origin.trim())
