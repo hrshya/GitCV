@@ -74,8 +74,8 @@ export default function Home() {
   return (
     <main className="mono-site">
       <header className="mono-nav mono-shell">
-        <Link className="mono-brand" href="/" aria-label="GitCV home">
-          GitCV
+        <Link className="mono-brand" href="/" aria-label="Gitume home">
+          Gitume
         </Link>
         <nav aria-label="Primary navigation">
           <a href="#selection">Selection</a>
@@ -122,7 +122,7 @@ export default function Home() {
             <p>Architecture choices, scalability patterns, and stack depth.</p>
           </article>
           <article>
-            <span>GitCV selects</span>
+            <span>Gitume selects</span>
             <p>The projects that match the role, then turns them into specific bullets.</p>
           </article>
         </div>
@@ -133,7 +133,7 @@ export default function Home() {
           <p className="mono-kicker">Project selection</p>
           <h2>Not Every Project Belongs on Every Resume</h2>
           <p>
-            Different roles look for different signals. GitCV selects the projects that best match
+            Different roles look for different signals. Gitume selects the projects that best match
             the role, then turns that evidence into specific resume language.
           </p>
         </div>

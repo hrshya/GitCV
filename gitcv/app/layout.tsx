@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GitCV - AI resume optimizer",
+  title: "Gitume - AI resume optimizer",
   description:
     "Upload your resume, paste a job description, and generate a tailored ATS-friendly resume using your most relevant projects.",
 };

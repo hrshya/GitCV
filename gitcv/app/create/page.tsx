@@ -40,6 +40,9 @@ function apiUrl(path: string) {
   return `${API_BASE}/${path.replace(/^\/+/, "")}`;
 }
 
+const GENERATION_TIMEOUT_MS = 180_000;
+const DOWNLOAD_TIMEOUT_MS = 60_000;
+
 const steps = [
   {
     label: "GitHub",
@@ -115,15 +118,24 @@ export default function CreatePage() {
       if (resumePdf) {
         const response = await axios.post<GenerateResumeResponse>(
           apiUrl("/api/v1/github"),
-          buildPdfPayload()
+          buildPdfPayload(),
+          {
+            timeout: GENERATION_TIMEOUT_MS,
+          }
         );
         result = response.data;
       } else {
-        const response = await axios.post<GenerateResumeResponse>(apiUrl("/api/v1/github"), {
-          username: username.trim(),
-          resumeData: resumeData.trim(),
-          jobDescription: jobDescription.trim(),
-        });
+        const response = await axios.post<GenerateResumeResponse>(
+          apiUrl("/api/v1/github"),
+          {
+            username: username.trim(),
+            resumeData: resumeData.trim(),
+            jobDescription: jobDescription.trim(),
+          },
+          {
+            timeout: GENERATION_TIMEOUT_MS,
+          }
+        );
         result = response.data;
       }
 
@@ -155,6 +167,7 @@ export default function CreatePage() {
     try {
       const response = await axios.get<Blob>(apiUrl(`/api/v1/github/download/${generatedResumeId}`), {
         responseType: "blob",
+        timeout: DOWNLOAD_TIMEOUT_MS,
       });
       const blob = response.data;
       const url = window.URL.createObjectURL(blob);
@@ -203,6 +216,10 @@ export default function CreatePage() {
 
   function getBackendErrorMessage(error: unknown, fallback: string) {
     if (axios.isAxiosError<BackendErrorResponse>(error)) {
+      if (error.code === "ECONNABORTED") {
+        return "Resume generation took too long. Please try again, or retry with a shorter resume/job description.";
+      }
+
       return error.response?.data?.error || fallback;
     }
 
@@ -212,9 +229,9 @@ export default function CreatePage() {
   return (
     <main className="site create-site">
       <header className="nav-shell shell">
-        <Link href="/" className="brand-mark" aria-label="GitCV home">
+        <Link href="/" className="brand-mark" aria-label="Gitume home">
           <span>G</span>
-          GitCV
+          Gitume
         </Link>
         <Button asChild variant="outline">
           <Link href="/">Back to home</Link>
@@ -226,7 +243,7 @@ export default function CreatePage() {
           <Badge variant="outline">Create route</Badge>
           <h1>Build a role-specific resume in three calm steps</h1>
           <p>
-            Paste the pieces you already have. GitCV will use your GitHub projects as evidence and
+            Paste the pieces you already have. Gitume will use your GitHub projects as evidence and
             shape the final draft around the role.
           </p>
 
