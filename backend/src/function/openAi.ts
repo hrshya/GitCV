@@ -409,7 +409,7 @@ Return structured JSON.
 Additionally include:
 
 ## overall_summary
-Describe the ENGINEER — not the projects.
+Write a brief 2–3 line summary that captures the ENGINEER’s technical capabilities, engineering approach, and overall impact, excluding project descriptions.
 
 The summary should:
 - reflect technical identity
