@@ -1,71 +1,104 @@
 import Link from "next/link";
 import { GitumeLogo } from "@/components/GitumeLogo";
-import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 
-const roles = [
-  ["Backend", "APIs, databases, system design"],
-  ["Frontend", "UI architecture, state, performance"],
-  ["Infra", "Scale, reliability, distributed systems"],
+const navItems = [
+  ["Features", "#features"],
+  ["Workflow", "#workflow"],
+  ["Preview", "#preview"],
+  ["FAQ", "#faq"],
 ];
 
-const projects = [
-  ["AtlasFlow", "Ingestion engine", "96"],
-  ["LumenQueue", "Worker orchestration", "91"],
-  ["HarborKit", "Access layer", "88"],
+const roleSignals = [
+  ["Backend", "APIs", "Postgres", "system design"],
+  ["Frontend", "state", "performance", "UI depth"],
+  ["Infra", "queues", "reliability", "scale"],
+];
+
+const featureCards = [
+  {
+    title: "Dynamic Project Selection",
+    body: "Picks different projects for different roles automatically.",
+    metric: "3/14",
+    label: "best-fit projects",
+  },
+  {
+    title: "Project Ranking",
+    body: "Identifies the strongest work from your public repositories.",
+    metric: "94",
+    label: "role-fit score",
+  },
+  {
+    title: "Structured Bullet Generation",
+    body: "Turns real engineering decisions into clear recruiter-ready bullets.",
+    metric: "ATS",
+    label: "clean output",
+  },
 ];
 
 const workflow = [
-  ["Add GitHub Username", "We analyze and rank your projects."],
-  ["Upload Resume", "We extract your education, experience, and background."],
-  ["Paste Job Description", "We match your projects to what the role actually needs."],
-  ["Generate & Download", "Get a clean, ready-to-use PDF."],
+  ["01", "Add GitHub", "We scan repositories and extract meaningful engineering signals."],
+  ["02", "Add Resume", "We preserve your background, experience, education, and voice."],
+  ["03", "Add Role", "The job description guides which projects deserve the spotlight."],
+  ["04", "Download PDF", "You get a focused resume built from your actual work."],
 ];
 
-const features = [
-  ["Dynamic Project Selection", "Picks different projects for different roles automatically"],
-  ["Project Ranking", "Identifies your strongest and most relevant work"],
-  ["Structured Bullet Generation", "Clear, specific, grounded in real engineering work"],
-  ["Job Description Alignment", "Resume adapts per role"],
-  ["ATS-Friendly Output", "Clean formatting that works"],
-  ["Markdown to PDF Export", "Fast, flexible resume generation"],
-];
-
-function SignalComposition() {
+function MatchGalaxy() {
   return (
-    <div className="signal-composition" aria-label="Role matching signal composition">
-      <div className="composition-label">
-        <span>Signal Composition</span>
-        <span>3 projects selected</span>
+    <div className="os-galaxy" aria-label="GitHub project matching visual">
+      <div className="os-galaxy-core">
+        <span>94</span>
+        <p>Role-fit</p>
       </div>
-
-      <div className="composition-field">
-        <div className="field-axis horizontal" aria-hidden="true" />
-        <div className="field-axis vertical" aria-hidden="true" />
-
-        <article className="composition-core">
-          <span>94</span>
-          <small>Backend AI Engineer</small>
-        </article>
-
-        {projects.map(([name, detail, score], index) => (
-          <article className={`composition-node node-${index + 1}`} key={name}>
-            <em>{score}</em>
-            <strong>{name}</strong>
-            <small>{detail}</small>
-          </article>
-        ))}
-
-        <div className="signal-column">
-          {["APIs", "Postgres", "Realtime", "Auth"].map((signal) => (
-            <span key={signal}>{signal}</span>
-          ))}
+      {["API Gateway", "Realtime Voice", "Finance Core", "Branch Graph"].map((project, index) => (
+        <div className={`os-project-chip os-chip-${index + 1}`} key={project}>
+          <span>{project}</span>
+          <small>{index === 0 ? "Selected" : "Ranked"}</small>
         </div>
+      ))}
+      <div className="os-galaxy-ring ring-one" />
+      <div className="os-galaxy-ring ring-two" />
+    </div>
+  );
+}
 
-        <article className="composition-output">
-          <span>Generated emphasis</span>
-          <p>Systems depth, backend ownership, reliable data paths.</p>
-        </article>
+function ResumePreview() {
+  return (
+    <div className="os-preview-window" id="preview" aria-label="Role-specific resume preview">
+      <div className="os-window-bar">
+        <span />
+        <span />
+        <span />
+        <p>Gitume resume engine</p>
+      </div>
+      <div className="os-preview-body">
+        <aside className="os-preview-panel">
+          <p>Signal Map</p>
+          {roleSignals.map(([role, ...signals]) => (
+            <div className="os-signal-row" key={role}>
+              <strong>{role}</strong>
+              <span>{signals.join(" / ")}</span>
+            </div>
+          ))}
+        </aside>
+        <section className="os-resume-card">
+          <div>
+            <p>Generated Resume</p>
+            <h3>Backend AI Engineer</h3>
+          </div>
+          <article>
+            <span>Selected Project</span>
+            <strong>Finance ingestion platform</strong>
+            <p>
+              Engineered parallel ingestion and deduplication pipelines across live payment systems,
+              reducing dashboard latency to sub-second reads.
+            </p>
+          </article>
+          <article>
+            <span>Recruiter Emphasis</span>
+            <strong>systems depth, data reliability, backend ownership</strong>
+          </article>
+        </section>
       </div>
     </div>
   );
@@ -73,92 +106,105 @@ function SignalComposition() {
 
 export default function Home() {
   return (
-    <main className="mono-site">
-      <header className="mono-nav mono-shell">
-        <Link className="mono-brand" href="/" aria-label="Gitume home">
+    <main className="os-site">
+      <div className="os-noise" aria-hidden="true" />
+
+      <header className="os-nav">
+        <Link className="os-brand" href="/" aria-label="Gitume home">
           <GitumeLogo />
         </Link>
         <nav aria-label="Primary navigation">
-          <a href="#selection">Selection</a>
-          <a href="#workflow">Workflow</a>
-          <a href="#features">Features</a>
+          {navItems.map(([label, href]) => (
+            <a href={href} key={label}>
+              {label}
+            </a>
+          ))}
         </nav>
-        <ShimmerButton className="mono-nav-button" href="/create" size="sm">
+        <ShimmerButton className="os-nav-button" href="/create" size="sm">
           Generate
         </ShimmerButton>
       </header>
 
-      <section className="mono-hero mono-shell">
-        <div className="mono-hero-copy">
-          <p className="mono-kicker">Dynamic AI Resume Generation</p>
-          <h1>Turn Your GitHub Into a Resume That Gets Interviews</h1>
-          <p>
-            Upload your resume, paste a job description, and generate a tailored, ATS-friendly
-            resume using your most relevant projects.
-          </p>
-          <div className="mono-actions">
-            <ShimmerButton className="mono-solid-button" href="/create">Generate My Resume</ShimmerButton>
-            <Button asChild className="mono-outline-button" size="lg" variant="outline">
-              <a href="#selection">See the system</a>
-            </Button>
-          </div>
+      <section className="os-hero">
+        <div className="os-hero-badge">
+          <span>AI</span>
+          <p>Dynamic resume generation</p>
+        </div>
+        <h1>Turn Your GitHub Into a Resume That Gets Interviews</h1>
+        <p>
+          Upload your resume, paste a job description, and generate a tailored, ATS-friendly resume
+          using your most relevant projects.
+        </p>
+        <div className="os-hero-actions">
+          <ShimmerButton className="os-primary-button" href="/create" size="lg">
+            Generate My Resume
+          </ShimmerButton>
+          <a className="os-secondary-button" href="#features">
+            See how it works
+          </a>
         </div>
 
-        <SignalComposition />
-      </section>
-
-      <section className="mono-section mono-shell mismatch-editorial">
-        <div className="mismatch-editorial-copy">
-          <p className="mono-kicker">The mismatch</p>
-          <h2>The work is strong. The resume is pointing at the wrong proof.</h2>
-        </div>
-
-        <div className="proof-shift" aria-label="Resume evidence shift">
-          <article>
-            <span>Resume says</span>
-            <p>Built a web app with authentication.</p>
-          </article>
-          <article>
-            <span>GitHub shows</span>
-            <p>Architecture choices, scalability patterns, and stack depth.</p>
-          </article>
-          <article>
-            <span>Gitume selects</span>
-            <p>The projects that match the role, then turns them into specific bullets.</p>
-          </article>
-        </div>
-      </section>
-
-      <section className="mono-section mono-shell" id="selection">
-        <div className="mono-section-head">
-          <p className="mono-kicker">Project selection</p>
-          <h2>Not Every Project Belongs on Every Resume</h2>
-          <p>
-            Different roles look for different signals. Gitume selects the projects that best match
-            the role, then turns that evidence into specific resume language.
-          </p>
-        </div>
-
-        <div className="mono-role-board">
-          {roles.map(([role, signal]) => (
-            <article key={role}>
-              <span>{role}</span>
-              <p>{signal}</p>
-            </article>
+        <div className="os-hero-strip" aria-label="Resume generation highlights">
+          {["GitHub analyzed", "Projects ranked", "Role matched", "PDF exported"].map((item) => (
+            <span key={item}>{item}</span>
           ))}
         </div>
       </section>
 
-      <section className="mono-section mono-shell" id="workflow">
-        <div className="mono-section-head compact">
-          <p className="mono-kicker">How it works</p>
-          <h2>Four steps. One role-specific PDF.</h2>
+      <section className="os-feature-stage" id="features">
+        <div className="os-section-heading">
+          <p>Supercharge Your Resume Workflow</p>
+          <h2>One engine for project selection, bullet quality, and role alignment.</h2>
         </div>
 
-        <div className="mono-workflow">
-          {workflow.map(([title, body], index) => (
+        <div className="os-bento">
+          <article className="os-card os-card-list">
+            <span className="os-card-kicker">Project evidence</span>
+            <h3>Your resume stops underselling the work.</h3>
+            <div className="os-evidence-list">
+              {["System architecture", "Scalability patterns", "Engineering complexity"].map((item) => (
+                <div key={item}>
+                  <i />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="os-card os-card-center">
+            <span className="os-card-kicker">Matching layer</span>
+            <h3>The right projects rise to the top.</h3>
+            <MatchGalaxy />
+          </article>
+
+          <article className="os-card os-card-filter">
+            <span className="os-card-kicker">Precision filters</span>
+            <h3>Different role, different resume.</h3>
+            <div className="os-filter-stack">
+              {roleSignals.map(([role, ...signals]) => (
+                <div key={role}>
+                  <strong>{role}</strong>
+                  <p>{signals.join(", ")}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="os-preview-section">
+        <ResumePreview />
+      </section>
+
+      <section className="os-workflow" id="workflow">
+        <div className="os-section-heading compact">
+          <p>How it works</p>
+          <h2>Four steps. One role-specific PDF.</h2>
+        </div>
+        <div className="os-timeline">
+          {workflow.map(([number, title, body]) => (
             <article key={title}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
+              <span>{number}</span>
               <h3>{title}</h3>
               <p>{body}</p>
             </article>
@@ -166,38 +212,28 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mono-section mono-shell" id="features">
-        <div className="feature-index">
-          <div className="feature-index-head">
-            <p className="mono-kicker">Key features</p>
-            <h2>Everything serves project-to-role alignment.</h2>
-          </div>
-
-          <div className="feature-index-grid">
-            {features.map(([title, body]) => (
-              <article key={title}>
-                <span>{title.split(" ").slice(0, 2).join(" ")}</span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="feature-index-footer">
-            <span>Same GitHub</span>
-            <i />
-            <span>Different job</span>
-            <i />
-            <span>Different resume</span>
-          </div>
-        </div>
+      <section className="os-feature-row">
+        {featureCards.map((feature) => (
+          <article className="os-stat-card" key={feature.title}>
+            <div>
+              <span>{feature.metric}</span>
+              <small>{feature.label}</small>
+            </div>
+            <h3>{feature.title}</h3>
+            <p>{feature.body}</p>
+          </article>
+        ))}
       </section>
 
-      <section className="mono-cta mono-shell">
-        <p className="mono-kicker">Final draft</p>
-        <h2>Make Your Work Speak Clearly</h2>
+      <section className="os-faq" id="faq">
+        <div className="os-section-heading compact">
+          <p>Final CTA</p>
+          <h2>Make Your Work Speak Clearly</h2>
+        </div>
         <p>Use the right projects for the right role, automatically.</p>
-        <ShimmerButton className="mono-solid-button" href="/create">Generate My Resume</ShimmerButton>
+        <ShimmerButton className="os-primary-button" href="/create" size="lg">
+          Generate My Resume
+        </ShimmerButton>
       </section>
     </main>
   );
