@@ -106,6 +106,10 @@ export const RankedSchema = z.object({
     stack: z.array(z.string()),
     key_features: z.array(z.string()),
     complexity_tags: z.array(z.string()),
+    architecture: z.array(z.string()).optional(),
+    resume_bullet_evidence: z.array(z.string()).optional(),
+    scalability_or_performance: z.array(z.string()).optional(),
+    evidence_confidence: z.number().optional(),
     score: z.number(),
     impact_signals: z.object({
         stars: z.number(),
