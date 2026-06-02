@@ -30,6 +30,7 @@ export const githubRouter = express.Router();
 const token = process.env.GITHUB_TOKEN;
 const githubHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
 const generatedResumeRoot = path.resolve("generated", "resumes");
+const resumeRetentionMs = 24 * 60 * 60 * 1000;
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -67,6 +68,7 @@ type RateLimitReservation = {
 
 type ResumeMetadata = ResumeDownloadOwner & {
   createdAt: string;
+  expiresAt?: string;
 };
 
 function getStringInput(value: unknown): string {
@@ -161,6 +163,87 @@ function readResumeMetadata(resumeId: string): ResumeMetadata | null {
   }
 }
 
+function getResumeExpiresAt(createdAt: string, expiresAt?: string) {
+  if (expiresAt) {
+    return expiresAt;
+  }
+
+  const createdMs = new Date(createdAt).getTime();
+  const baseMs = Number.isFinite(createdMs) ? createdMs : Date.now();
+  return new Date(baseMs + resumeRetentionMs).toISOString();
+}
+
+function isExpired(expiresAt: string) {
+  return new Date(expiresAt).getTime() <= Date.now();
+}
+
+async function readStoredResume(resumeId: string) {
+  const { markdownPath, pdfPath } = getResumePaths(resumeId);
+  const metadata = readResumeMetadata(resumeId);
+  let markdown = fs.existsSync(markdownPath) ? fs.readFileSync(markdownPath, "utf8") : "";
+  let owner: ResumeDownloadOwner = metadata
+    ? {
+        githubUsername: metadata.githubUsername,
+        name: metadata.name ?? null,
+        resumeId,
+        userId: metadata.userId ?? null,
+      }
+    : {
+        githubUsername: "unknown",
+        name: null,
+        resumeId,
+        userId: null,
+      };
+  let createdAt = metadata?.createdAt || new Date().toISOString();
+
+  if (!markdown || !metadata) {
+    try {
+      const resume = await prisma.resume.findUnique({
+        where: {
+          id: resumeId,
+        },
+        include: {
+          user: true,
+        },
+      });
+
+      if (resume) {
+        markdown = markdown || resume.markdown;
+        createdAt = metadata?.createdAt || resume.createdAt.toISOString();
+        owner = {
+          githubUsername: resume.user?.githubUsername || metadata?.githubUsername || "unknown",
+          name: metadata?.name ?? resume.user?.name ?? null,
+          resumeId,
+          userId: metadata?.userId ?? resume.userId ?? null,
+        };
+      }
+    } catch (dbErr) {
+      console.error("Prisma resume read failed:", dbErr);
+    }
+  }
+
+  if (!markdown) {
+    return null;
+  }
+
+  const expiresAt = getResumeExpiresAt(createdAt, metadata?.expiresAt);
+
+  return {
+    downloadUrl: `/api/v1/github/download/${resumeId}`,
+    expiresAt,
+    metadata: {
+      ...owner,
+      createdAt,
+      expiresAt,
+    },
+    pdfReady: fs.existsSync(pdfPath),
+    pdfUrl: `/api/v1/github/resumes/${resumeId}/pdf`,
+    resultUrl: `/resume/${resumeId}`,
+    resumeId,
+    resumeMarkdown: markdown,
+  };
+}
+
 async function getResumeDownloadOwner(resumeId: string): Promise<ResumeDownloadOwner> {
   const metadata = readResumeMetadata(resumeId);
 
@@ -203,9 +286,103 @@ async function getResumeDownloadOwner(resumeId: string): Promise<ResumeDownloadO
   };
 }
 
-async function downloadResumeById(resumeId: string, res: express.Response) {
+async function hasStoredResume(resumeId: string): Promise<boolean> {
+  try {
+    const { markdownPath } = getResumePaths(resumeId);
+
+    if (readResumeMetadata(resumeId) || fs.existsSync(markdownPath)) {
+      return true;
+    }
+
+    const resume = await prisma.resume.findUnique({
+      where: {
+        id: resumeId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return Boolean(resume);
+  } catch {
+    return false;
+  }
+}
+
+async function updateStoredResumeMarkdown(resumeId: string, markdown: string) {
+  const { markdownPath, pdfPath, resumeDir } = getResumePaths(resumeId);
+  fs.mkdirSync(resumeDir, { recursive: true });
+  fs.writeFileSync(markdownPath, markdown);
+
+  if (fs.existsSync(pdfPath)) {
+    fs.unlinkSync(pdfPath);
+  }
+
+  try {
+    await prisma.resume.update({
+      where: {
+        id: resumeId,
+      },
+      data: {
+        markdown,
+      },
+    });
+  } catch (dbErr) {
+    console.error("Prisma resume markdown update failed:", dbErr);
+  }
+}
+
+async function ensureResumePdf(resumeId: string, markdownOverride?: string) {
+  const { markdownPath, pdfPath } = getResumePaths(resumeId);
+
+  if (typeof markdownOverride === "string") {
+    const markdown = markdownOverride.trim();
+
+    if (!markdown) {
+      throw new Error("Markdown is required");
+    }
+
+    if (!(await hasStoredResume(resumeId))) {
+      throw new Error("Resume not found");
+    }
+
+    await updateStoredResumeMarkdown(resumeId, markdown);
+    await markdownToPDF(markdownPath, pdfPath);
+    return;
+  }
+
+  if (!fs.existsSync(markdownPath)) {
+    const stored = await readStoredResume(resumeId);
+
+    if (stored) {
+      fs.mkdirSync(path.dirname(markdownPath), { recursive: true });
+      fs.writeFileSync(markdownPath, stored.resumeMarkdown);
+    }
+  }
+
+  if (!fs.existsSync(pdfPath) && fs.existsSync(markdownPath)) {
+    await markdownToPDF(markdownPath, pdfPath);
+  }
+}
+
+async function downloadResumeById(
+  resumeId: string,
+  res: express.Response,
+  markdownOverride?: string
+) {
   try {
     const { pdfPath } = getResumePaths(resumeId);
+    const stored = await readStoredResume(resumeId);
+
+    if (!stored) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+
+    if (isExpired(stored.expiresAt)) {
+      return res.status(410).json({ error: "Resume link expired" });
+    }
+
+    await ensureResumePdf(resumeId, markdownOverride);
 
     if (!fs.existsSync(pdfPath)) {
       return res.status(404).json({ error: "PDF not found" });
@@ -224,8 +401,10 @@ async function downloadResumeById(resumeId: string, res: express.Response) {
         console.error("Download error:", err);
       }
     });
-  } catch {
-    return res.status(400).json({ error: "Invalid resume id" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid resume id";
+    const status = message === "Resume not found" ? 404 : 400;
+    return res.status(status).json({ error: message });
   }
 }
 
@@ -354,6 +533,10 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
             impact_signals: ranked.impact_signals,
             structure: ranked.structure,
             highlight_hint: ranked.highlight_hint,
+            architecture: ranked.architecture || [],
+            resume_bullet_evidence: ranked.resume_bullet_evidence || [],
+            scalability_or_performance: ranked.scalability_or_performance || [],
+            evidence_confidence: ranked.evidence_confidence || 0,
           };
           try {
             await prisma.repoCache.create({
@@ -379,17 +562,29 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
               userId: user.id,
             },
           });
-          rankedRepos = cachedRepos.map((cache: any) => ({
-            project_name: cache.repoName,
-            score: cache.score,
-            summary: cache.metadata.summary,
-            stack: cache.metadata.stack,
-            key_features: cache.metadata.key_features,
-            complexity_tags: cache.metadata.complexity_tags,
-            impact_signals: cache.metadata.impact_signals,
-            structure: cache.metadata.structure,
-            highlight_hint: cache.metadata.highlight_hint,
-          }));
+          const cacheHasRepoEvidence = cachedRepos.every((cache: any) =>
+            cache.metadata && "evidence_confidence" in cache.metadata
+          );
+
+          if (cachedRepos.length > 0 && cacheHasRepoEvidence) {
+            rankedRepos = cachedRepos.map((cache: any) => ({
+              project_name: cache.repoName,
+              score: cache.score,
+              summary: cache.metadata.summary,
+              stack: cache.metadata.stack,
+              key_features: cache.metadata.key_features,
+              complexity_tags: cache.metadata.complexity_tags,
+              impact_signals: cache.metadata.impact_signals,
+              structure: cache.metadata.structure,
+              highlight_hint: cache.metadata.highlight_hint,
+              architecture: cache.metadata.architecture || [],
+              resume_bullet_evidence: cache.metadata.resume_bullet_evidence || [],
+              scalability_or_performance: cache.metadata.scalability_or_performance || [],
+              evidence_confidence: cache.metadata.evidence_confidence || 0,
+            }));
+          } else {
+            rankedRepos = await RankingSystem(repoResponse?.data || [], username);
+          }
         } catch (cacheErr) {
           console.error("Prisma repo cache read failed:", cacheErr);
           rankedRepos = [];
@@ -527,13 +722,15 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
 
     // ---------- SAVE FILE ----------
     const resumeId = randomUUID();
-    const { resumeDir, markdownPath, pdfPath } = getResumePaths(resumeId);
+    const { resumeDir, markdownPath } = getResumePaths(resumeId);
     fs.mkdirSync(resumeDir, { recursive: true });
     fs.writeFileSync(markdownPath, resumeMarkdown);
-    await markdownToPDF(markdownPath, pdfPath);
     const downloadUrl = `/api/v1/github/download/${resumeId}`;
+    const createdAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + resumeRetentionMs).toISOString();
     writeResumeMetadata({
-      createdAt: new Date().toISOString(),
+      createdAt,
+      expiresAt,
       githubUsername: username,
       name: response?.user?.name || userResponse?.data?.name || username,
       resumeId,
@@ -570,10 +767,13 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
     );
 
     res.json({
+      expiresAt,
       response,
       resumeMarkdown,
       resumeId,
       downloadUrl,
+      pdfUrl: `/api/v1/github/resumes/${resumeId}/pdf`,
+      resultUrl: `/resume/${resumeId}`,
       usage: generationUsage,
     });
   } catch (error: any) {
@@ -589,6 +789,115 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
   }
 });
 
+githubRouter.get("/resumes/:resumeId", async (req, res) => {
+  try {
+    const stored = await readStoredResume(req.params.resumeId);
+
+    if (!stored) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+
+    if (isExpired(stored.expiresAt)) {
+      return res.status(410).json({ error: "Resume link expired" });
+    }
+
+    return res.json(stored);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid resume id";
+    return res.status(400).json({ error: message });
+  }
+});
+
+githubRouter.put("/resumes/:resumeId", async (req, res) => {
+  try {
+    const markdown = getStringInput(req.body.markdown).trim();
+
+    if (!markdown) {
+      return res.status(400).json({ error: "Markdown is required" });
+    }
+
+    const stored = await readStoredResume(req.params.resumeId);
+
+    if (!stored) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+
+    if (isExpired(stored.expiresAt)) {
+      return res.status(410).json({ error: "Resume link expired" });
+    }
+
+    await updateStoredResumeMarkdown(req.params.resumeId, markdown);
+
+    return res.json({
+      ...stored,
+      pdfReady: false,
+      resumeMarkdown: markdown,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid resume id";
+    return res.status(400).json({ error: message });
+  }
+});
+
+githubRouter.post("/resumes/:resumeId/pdf", async (req, res) => {
+  try {
+    const stored = await readStoredResume(req.params.resumeId);
+
+    if (!stored) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+
+    if (isExpired(stored.expiresAt)) {
+      return res.status(410).json({ error: "Resume link expired" });
+    }
+
+    const hasMarkdownOverride = Object.prototype.hasOwnProperty.call(req.body || {}, "markdown");
+    const markdown = getStringInput(req.body.markdown);
+    await ensureResumePdf(req.params.resumeId, hasMarkdownOverride ? markdown : undefined);
+
+    return res.json({
+      ...stored,
+      pdfReady: true,
+      resumeMarkdown: hasMarkdownOverride ? markdown : stored.resumeMarkdown,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid resume id";
+    return res.status(400).json({ error: message });
+  }
+});
+
+githubRouter.get("/resumes/:resumeId/pdf", async (req, res) => {
+  try {
+    const stored = await readStoredResume(req.params.resumeId);
+
+    if (!stored) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+
+    if (isExpired(stored.expiresAt)) {
+      return res.status(410).json({ error: "Resume link expired" });
+    }
+
+    const { pdfPath } = getResumePaths(req.params.resumeId);
+    await ensureResumePdf(req.params.resumeId);
+
+    if (!fs.existsSync(pdfPath)) {
+      return res.status(404).json({ error: "PDF not found" });
+    }
+
+    const owner = await getResumeDownloadOwner(req.params.resumeId);
+    const disposition = getStringInput(req.query.disposition) === "attachment" ? "attachment" : "inline";
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `${disposition}; filename="${getSafeResumeFileName(owner.name)}"`);
+
+    return res.sendFile(pdfPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid resume id";
+    return res.status(400).json({ error: message });
+  }
+});
+
 githubRouter.get("/analytics/downloads", (_req, res) => {
   return res.json(getDownloadAnalytics());
 });
@@ -599,6 +908,11 @@ githubRouter.get("/analytics/downloads/users/:githubUsername", (req, res) => {
 
 githubRouter.get("/download/:resumeId", async (req, res) => {
   return downloadResumeById(req.params.resumeId, res);
+});
+
+githubRouter.post("/download/:resumeId", async (req, res) => {
+  const markdown = getStringInput(req.body.markdown);
+  return downloadResumeById(req.params.resumeId, res, markdown);
 });
 
 githubRouter.get("/download", async (req, res) => {

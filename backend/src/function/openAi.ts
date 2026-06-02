@@ -481,8 +481,20 @@ function buildPrompt(repos: RankedProject[]): string {
                 Complexity:
                 ${repo.complexity_tags.join(", ")}
 
+                Architecture Evidence:
+                ${(repo.architecture || []).join("\n")}
+
+                Scalability / Performance Evidence:
+                ${(repo.scalability_or_performance || []).join("\n")}
+
+                Resume Bullet Evidence:
+                ${(repo.resume_bullet_evidence || []).join("\n")}
+
                 Highlight Hint:
                 ${repo.highlight_hint}
+
+                Evidence Confidence:
+                ${repo.evidence_confidence ?? "unknown"}
 
                 ---
 
