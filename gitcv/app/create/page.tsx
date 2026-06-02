@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Toaster, toast as notify } from "sonner";
@@ -19,8 +20,10 @@ type GenerateResumeResponse = {
       name?: string;
     };
   };
+  resumeMarkdown?: string;
   resumeId?: string;
   downloadUrl?: string;
+  resultUrl?: string;
   usage?: {
     dailyLimit?: number;
     remainingToday?: number;
@@ -42,7 +45,6 @@ function apiUrl(path: string) {
 }
 
 const GENERATION_TIMEOUT_MS = 180_000;
-const DOWNLOAD_TIMEOUT_MS = 60_000;
 
 const steps = [
   {
@@ -70,6 +72,7 @@ const loadingSteps = [
 ];
 
 export default function CreatePage() {
+  const router = useRouter();
   const [activeStep, setActiveStep] = useState(0);
   const [username, setUsername] = useState("");
   const [resumeData, setResumeData] = useState("");
@@ -77,14 +80,11 @@ export default function CreatePage() {
   const [jobDescription, setJobDescription] = useState("");
   const [status, setStatus] = useState<GenerationState>("idle");
   const [loadingStepIndex, setLoadingStepIndex] = useState(0);
-  const [downloadReady, setDownloadReady] = useState(false);
-  const [generatedResumeId, setGeneratedResumeId] = useState("");
-  const [downloadFileName, setDownloadFileName] = useState("Candidate_Resume.pdf");
 
   const completion = useMemo(() => {
-    const done = [username.trim(), resumeData.trim() || resumePdf, jobDescription.trim()].filter(Boolean).length;
-    return Math.round((done / 3) * 100);
-  }, [jobDescription, resumeData, resumePdf, username]);
+    const done = [username.trim(), resumeData.trim() || resumePdf].filter(Boolean).length;
+    return Math.round((done / 2) * 100);
+  }, [resumeData, resumePdf, username]);
 
   const hasResumeInput = resumeData.trim().length > 0 || Boolean(resumePdf);
   const canGenerate = username.trim().length > 0 && hasResumeInput;
@@ -110,9 +110,6 @@ export default function CreatePage() {
 
     setStatus("loading");
     setLoadingStepIndex(0);
-    setDownloadReady(false);
-    setGeneratedResumeId("");
-    setDownloadFileName("Candidate_Resume.pdf");
 
     try {
       let result: GenerateResumeResponse;
@@ -144,44 +141,20 @@ export default function CreatePage() {
         throw new Error("Generation response did not include a resume id");
       }
 
-      setGeneratedResumeId(result.resumeId);
-      setDownloadFileName(getResumeFileName(result.response?.user?.name));
+      if (!result.resumeMarkdown?.trim()) {
+        throw new Error("Generation response did not include markdown");
+      }
+
       setStatus("success");
-      setDownloadReady(true);
       notify.success(
         typeof result.usage?.remainingToday === "number"
-          ? `Resume generated. ${result.usage.remainingToday} generations left today.`
-          : "Resume generated. PDF is ready to download."
+          ? `Resume draft saved. ${result.usage.remainingToday} generations left today.`
+          : "Resume draft saved. Opening result page."
       );
+      router.push(result.resultUrl || `/resume/${result.resumeId}`);
     } catch (error) {
       setStatus("error");
       notify.error(getBackendErrorMessage(error, "Could not generate the resume. Check the backend and try again."));
-    }
-  }
-
-  async function downloadPdf() {
-    if (!generatedResumeId) {
-      notify.error("Generate a resume before downloading.");
-      return;
-    }
-
-    try {
-      const response = await axios.get<Blob>(apiUrl(`/api/v1/github/download/${generatedResumeId}`), {
-        responseType: "blob",
-        timeout: DOWNLOAD_TIMEOUT_MS,
-      });
-      const blob = response.data;
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = downloadFileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.URL.revokeObjectURL(url);
-      notify.success("PDF download started.");
-    } catch {
-      notify.error("PDF download failed. Generate the resume again and retry.");
     }
   }
 
@@ -204,15 +177,6 @@ export default function CreatePage() {
       formData.append("resumePdf", resumePdf);
     }
     return formData;
-  }
-
-  function getResumeFileName(name?: string) {
-    const safeName = (name || "Candidate")
-      .trim()
-      .replace(/[^\p{L}\p{N}]+/gu, "_")
-      .replace(/^_+|_+$/g, "");
-
-    return `${safeName || "Candidate"}_Resume.pdf`;
   }
 
   function getBackendErrorMessage(error: unknown, fallback: string) {
@@ -262,7 +226,13 @@ export default function CreatePage() {
               const isComplete =
                 (index === 0 && username.trim()) ||
                 (index === 1 && hasResumeInput) ||
-                (index === 2 && jobDescription.trim());
+                index === 2;
+              const stepMarker =
+                index === 2 && !jobDescription.trim()
+                  ? "OPT"
+                  : isComplete
+                    ? "OK"
+                    : index + 1;
 
               return (
                 <button
@@ -271,7 +241,7 @@ export default function CreatePage() {
                   onClick={() => setActiveStep(index)}
                   type="button"
                 >
-                  <span>{isComplete ? "OK" : index + 1}</span>
+                  <span>{stepMarker}</span>
                   <div>
                     <strong>{step.label}</strong>
                     <small>{step.caption}</small>
@@ -395,20 +365,10 @@ export default function CreatePage() {
                   </Button>
                 ) : (
                   <ShimmerButton disabled={!canGenerate || status === "loading"} type="submit">
-                    {status === "loading" ? "Working..." : "Generate Resume"}
+                    {status === "loading" ? "Working..." : "Generate Preview"}
                   </ShimmerButton>
                 )}
               </div>
-
-              <Button
-                className="download-button"
-                disabled={!downloadReady || status === "loading"}
-                onClick={downloadPdf}
-                type="button"
-                variant="outline"
-              >
-                Download PDF
-              </Button>
             </CardContent>
           </Card>
         </form>
