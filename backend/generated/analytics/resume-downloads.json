@@ -6,101 +6,19 @@
       "lastDownloadedAt": "2026-05-21T11:59:44.988Z",
       "name": "Vasudev Siddh",
       "userId": null
-    },
-    "9ef958dd-2d9b-471a-8ae4-1638f26a2a51": {
-      "downloadCount": 1,
-      "githubUsername": "jcubic",
-      "lastDownloadedAt": "2026-06-02T04:59:37.740Z",
-      "name": "Jakub T. Jankiewicz",
-      "userId": "6b6f1b81-3e03-41ce-a103-0706589f031d"
-    },
-    "6bfd1086-c7d6-43f7-bfec-8d1e28c0920d": {
-      "downloadCount": 1,
-      "githubUsername": "hrshya",
-      "lastDownloadedAt": "2026-06-02T05:50:53.810Z",
-      "name": "Harsh",
-      "userId": "409abae3-8245-406c-89cd-3abc603b103a"
-    },
-    "e60d7c41-a655-4a35-afe3-2363bb4c7115": {
-      "downloadCount": 1,
-      "githubUsername": "hrshya",
-      "lastDownloadedAt": "2026-06-02T05:53:58.993Z",
-      "name": "Harsh Yadav",
-      "userId": "409abae3-8245-406c-89cd-3abc603b103a"
-    },
-    "dc22bc41-e1b6-435a-a29d-fdd164b1ce33": {
-      "downloadCount": 1,
-      "githubUsername": "vasu-devs",
-      "lastDownloadedAt": "2026-06-02T08:00:13.619Z",
-      "name": "Vasudev Siddh",
-      "userId": "df1c0fe9-a5a5-419c-ba6c-501793a97956"
-    },
-    "41c2a0d8-eebc-4482-b71e-0f85fff11f29": {
-      "downloadCount": 1,
-      "githubUsername": "jcubic",
-      "lastDownloadedAt": "2026-06-02T08:07:37.722Z",
-      "name": "Jakub T. Jankiewicz",
-      "userId": "6b6f1b81-3e03-41ce-a103-0706589f031d"
-    },
-    "99b16329-7651-4ba5-bd96-0c1c498b3d13": {
-      "downloadCount": 2,
-      "githubUsername": "jcubic",
-      "lastDownloadedAt": "2026-06-02T08:41:26.878Z",
-      "name": "Jakub T. Jankiewicz",
-      "userId": "6b6f1b81-3e03-41ce-a103-0706589f031d"
-    },
-    "29d15d79-5394-46c8-884f-836d4afc4f02": {
-      "downloadCount": 1,
-      "githubUsername": "jcubic",
-      "lastDownloadedAt": "2026-06-02T08:54:14.326Z",
-      "name": "Jakub T. Jankiewicz",
-      "userId": "6b6f1b81-3e03-41ce-a103-0706589f031d"
-    },
-    "0acbbe7b-a4e2-4212-9796-8ad14a11ad30": {
-      "downloadCount": 2,
-      "githubUsername": "jcubic",
-      "lastDownloadedAt": "2026-06-02T09:45:11.947Z",
-      "name": "Jakub T. Jankiewicz",
-      "userId": "6b6f1b81-3e03-41ce-a103-0706589f031d"
     }
   },
-  "totalDownloads": 11,
+  "totalDownloads": 1,
   "users": {
     "vasu-devs": {
-      "downloadCount": 2,
+      "downloadCount": 1,
       "githubUsername": "vasu-devs",
-      "lastDownloadedAt": "2026-06-02T08:00:13.619Z",
+      "lastDownloadedAt": "2026-05-21T11:59:44.988Z",
       "name": "Vasudev Siddh",
       "resumeIds": [
-        "fcecf717-3b4a-417c-bef0-20abfaa8f411",
-        "dc22bc41-e1b6-435a-a29d-fdd164b1ce33"
+        "fcecf717-3b4a-417c-bef0-20abfaa8f411"
       ],
-      "userId": "df1c0fe9-a5a5-419c-ba6c-501793a97956"
-    },
-    "jcubic": {
-      "downloadCount": 7,
-      "githubUsername": "jcubic",
-      "lastDownloadedAt": "2026-06-02T09:45:11.947Z",
-      "name": "Jakub T. Jankiewicz",
-      "resumeIds": [
-        "9ef958dd-2d9b-471a-8ae4-1638f26a2a51",
-        "41c2a0d8-eebc-4482-b71e-0f85fff11f29",
-        "99b16329-7651-4ba5-bd96-0c1c498b3d13",
-        "29d15d79-5394-46c8-884f-836d4afc4f02",
-        "0acbbe7b-a4e2-4212-9796-8ad14a11ad30"
-      ],
-      "userId": "6b6f1b81-3e03-41ce-a103-0706589f031d"
-    },
-    "hrshya": {
-      "downloadCount": 2,
-      "githubUsername": "hrshya",
-      "lastDownloadedAt": "2026-06-02T05:53:58.993Z",
-      "name": "Harsh Yadav",
-      "resumeIds": [
-        "6bfd1086-c7d6-43f7-bfec-8d1e28c0920d",
-        "e60d7c41-a655-4a35-afe3-2363bb4c7115"
-      ],
-      "userId": "409abae3-8245-406c-89cd-3abc603b103a"
+      "userId": null
     }
   },
   "version": 1
