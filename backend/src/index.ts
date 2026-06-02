@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { githubRouter } from "./routes/github.js";
-import { jobsRouter } from "./routes/jobs.js";
 
 dotenv.config();
 const PORT = Number(process.env.PORT || 3001);
@@ -16,7 +15,7 @@ const allowedOrigins = [
 ];
 
 const app = express();
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json());
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
@@ -27,7 +26,7 @@ app.use(cors({
         callback(new Error(`CORS blocked origin: ${origin}`));
     },
     methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Cron-Secret"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     exposedHeaders: [
         "X-Resume-Download-Count",
         "X-Total-Resume-Downloads",
@@ -36,12 +35,11 @@ app.use(cors({
 }));
 
 app.use('/api/v1/github', githubRouter);
-app.use('/api/v1/jobs', jobsRouter);
 // app.use('/api/v1/product', productRouter);
 
 app.get("/", (_req, res) => {
     res.status(200).json({
-        service: "Gitume backend",
+        service: "GitCV backend",
         status: "ok",
     });
 });

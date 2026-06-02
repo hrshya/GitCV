@@ -3,11 +3,6 @@ import axios from "axios";
 import dotenv from "dotenv";
 import type { RankedProject } from "../utils/type.js";
 import { generateInsights } from "./insights.js";
-import {
-  enrichRepoEvidence,
-  extractDeterministicRepoEvidence,
-  mergeRepoEvidence,
-} from "./repoEvidence.js";
 
 dotenv.config();
 
@@ -15,10 +10,6 @@ const token = process.env.GITHUB_TOKEN;
 const BATCH_SIZE = 10;
 
 const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-function uniqueStrings(values: string[], limit: number) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).slice(0, limit);
-}
 
 // ---------- HELPERS ----------
 
@@ -82,27 +73,6 @@ async function processRepo(repo: GitHubRepo, username: string) {
 
   const readme = readmeRes.data;
   const readme_length = readmeRes.data.length;
-  const deterministicEvidence = extractDeterministicRepoEvidence({
-    defaultBranch: repo.default_branch,
-    description: repo.description,
-    homepage: repo.homepage || null,
-    language: repo.language,
-    name: repo.name,
-    readme,
-    topics: repo.topics || [],
-    tree,
-  });
-  const enrichedEvidence = await enrichRepoEvidence({
-    defaultBranch: repo.default_branch,
-    description: repo.description,
-    homepage: repo.homepage || null,
-    language: repo.language,
-    name: repo.name,
-    readme,
-    topics: repo.topics || [],
-    tree,
-  });
-  const repoEvidence = mergeRepoEvidence(deterministicEvidence, enrichedEvidence);
 
   const lastCommitDays =
     (Date.now() - new Date(repo.pushed_at).getTime()) /
@@ -347,24 +317,7 @@ async function processRepo(repo: GitHubRepo, username: string) {
   const complexity_tags: string[] = [];
   const key_features: string[] = [];
 
-  const parsedInsights = generateInsights(signals, complexity_tags, key_features);
-  const architectureFeatures = repoEvidence.architecture.map((item) => `Architecture: ${item}`);
-  const performanceFeatures = repoEvidence.scalability_or_performance.map((item) => `Scale/Performance: ${item}`);
-  const evidenceFeatures = repoEvidence.resume_bullet_evidence.map((item) => `Resume evidence: ${item}`);
-  const enrichedKeyFeatures = uniqueStrings(
-    [
-      ...repoEvidence.core_features,
-      ...architectureFeatures,
-      ...performanceFeatures,
-      ...evidenceFeatures,
-      ...parsedInsights.key_features,
-    ],
-    10
-  );
-  const enrichedComplexityTags = uniqueStrings(
-    [...repoEvidence.complexity_signals, ...parsedInsights.complexity_tags],
-    10
-  );
+  generateInsights(signals, complexity_tags, key_features);
 
   // ---------- SCORING ----------
 
@@ -419,15 +372,11 @@ async function processRepo(repo: GitHubRepo, username: string) {
 
   return {
     project_name: repo.name,
-    summary: repoEvidence.project_summary || readme.slice(0, 260) || "Project built using modern technologies",
-    stack: repoEvidence.tech_stack.length > 0 ? repoEvidence.tech_stack : repo.language ? [repo.language] : [],
-    key_features: enrichedKeyFeatures,
-    complexity_tags: enrichedComplexityTags,
-    architecture: repoEvidence.architecture,
-    resume_bullet_evidence: repoEvidence.resume_bullet_evidence,
-    scalability_or_performance: repoEvidence.scalability_or_performance,
-    evidence_confidence: repoEvidence.confidence,
-    score: final_score + repoEvidence.confidence * 8,
+    summary: readme.slice(0, 200) || "Project built using modern technologies",
+    stack: repo.language ? [repo.language] : [],
+    key_features,
+    complexity_tags,
+    score: final_score,
     impact_signals: {
       stars: repo.stargazers_count,
       forks: repo.forks_count,
@@ -440,11 +389,7 @@ async function processRepo(repo: GitHubRepo, username: string) {
       dir_count: num_dirs,
       depth: num_dirs ? Math.round(num_files / num_dirs) : 0,
     },
-    highlight_hint:
-      repoEvidence.resume_bullet_evidence[0] ||
-      repoEvidence.complexity_signals[0] ||
-      enrichedComplexityTags[0] ||
-      "Solid project",
+    highlight_hint: complexity_tags[0] || "Solid project",
   };
 }
 

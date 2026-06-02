@@ -62,30 +62,3 @@ model Resume {
 
   @@index([userId])
 }
-
-model GreenhouseJob {
-  id              String   @id @default(uuid())
-  sourceJobId     String
-  companySlug     String
-  companyName     String?
-  title           String
-  absoluteUrl     String
-  location        String?
-  department      String?
-  offices         String?
-  content         String?
-  active          Boolean  @default(true)
-  raw             Json?
-  sourceUpdatedAt DateTime?
-  firstSeenAt     DateTime @default(now())
-  lastSeenAt      DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([companySlug, sourceJobId])
-  @@index([companySlug])
-  @@index([active])
-  @@index([title])
-  @@index([lastSeenAt])
-  @@index([companySlug, active])
-}
