@@ -2,56 +2,55 @@ import * as React from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-type CommonProps = {
+type ShimmerButtonProps = {
   href?: string;
+  size?: "sm" | "md" | "lg";
+  variant?: "solid" | "ghost";
   className?: string;
+  type?: "button" | "submit" | "reset";
+  disabled?: boolean;
   children: React.ReactNode;
-  size?: "default" | "sm" | "lg";
-};
+} & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "type"> & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "href">;
 
-type ShimmerButtonProps = CommonProps & React.ButtonHTMLAttributes<HTMLButtonElement>;
+const baseClasses =
+  "inline-flex items-center justify-center rounded-full border border-transparent font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 disabled:cursor-not-allowed disabled:opacity-60";
 
-function getSizeClasses(size: "default" | "sm" | "lg") {
-  if (size === "sm") return "min-h-10 px-5 text-sm";
-  if (size === "lg") return "min-h-14 px-8 text-base";
-  return "min-h-12 px-7 text-[0.95rem]";
+function getSizeClasses(size: ShimmerButtonProps["size"]) {
+  if (size === "sm") return "h-11 px-4 text-sm";
+  if (size === "lg") return "h-14 px-7 text-base";
+  return "h-12 px-6 text-sm";
+}
+
+function getVariantClasses(variant: ShimmerButtonProps["variant"]) {
+  if (variant === "ghost") {
+    return "bg-white text-slate-950 shadow-sm hover:bg-slate-100";
+  }
+  return "bg-slate-950 text-white shadow-lg shadow-slate-900/5 hover:bg-slate-800";
 }
 
 export function ShimmerButton({
-  className,
-  children,
-  size = "default",
   href,
+  size = "md",
+  variant = "solid",
+  className,
   disabled,
-  type,
-  style,
+  type = "button",
+  children,
   ...props
 }: ShimmerButtonProps) {
-  const classes = cn(
-    "group relative inline-flex items-center justify-center overflow-hidden rounded-full border border-[#1b1714] bg-[#16120f] font-semibold text-white transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60",
-    getSizeClasses(size),
-    className,
-  );
-  const content = (
-    <>
-      <span className="relative z-10" style={{ color: "var(--button-text, #ffffff)" }}>
-        {children}
-      </span>
-      <span className="absolute inset-0 -translate-x-[120%] bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.28),transparent)] transition-transform duration-700 group-hover:translate-x-[120%]" />
-    </>
-  );
+  const classes = cn(baseClasses, getSizeClasses(size), getVariantClasses(variant), className);
 
   if (href) {
     return (
-      <Link href={href} className={classes} aria-disabled={disabled} style={{ color: "var(--button-text, #ffffff)", ...style }}>
-        {content}
+      <Link href={href} className={classes} aria-disabled={disabled ? true : undefined} {...props}>
+        {children}
       </Link>
     );
   }
 
   return (
-    <button className={classes} disabled={disabled} style={{ color: "var(--button-text, #ffffff)", ...style }} type={type} {...props}>
-      {content}
+    <button className={classes} type={type} disabled={disabled} {...props}>
+      {children}
     </button>
   );
 }
