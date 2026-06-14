@@ -125,8 +125,8 @@ export default function Home() {
         <div className="w-full h-full border-x border-x-zinc-800">
           <div className="h-full w-full p-4">
             <div className="relative border border-dashed border-zinc-800 flex h-[680px] w-full flex-col items-center justify-center overflow-hidden">
-              <p className="z-10 text-center text-5xl font-medium tracking-tighter whitespace-pre-wrap text-white">
-                Ripple
+              <p className="z-10 text-center text-3xl font-medium tracking-tighter whitespace-pre-wrap text-white">
+                Smart Layer
               </p>
               <Ripple />
             </div>
