@@ -11,7 +11,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 
-function SectionCard({ icon, iconBg, title, subtitle, tint, children, onEdit }) {
+function SectionCard({ icon, iconBg, title, subtitle, tint, children, onEdit }: any) {
   return (
     <div
       className={`rounded-xl border border-gray-200 p-6 ${
@@ -42,7 +42,7 @@ function SectionCard({ icon, iconBg, title, subtitle, tint, children, onEdit }) 
   );
 }
 
-function Tag({ children, color }) {
+function Tag({ children, color }: any) {
   const palettes = {
     orange: "bg-orange-50 text-orange-700 border-orange-100",
     teal: "bg-emerald-50 text-emerald-700 border-emerald-100",
