@@ -23,6 +23,8 @@ build/
 resume.pdf
 resume.md
 
-/src/generated/prisma
+generated/prisma
 
-/src/generated
+generated/
+
+.cache/
