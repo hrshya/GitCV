@@ -4,637 +4,304 @@ import type { RankedProject } from "../utils/type.ts";
 
 dotenv.config();
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY environment variable is required");
+}
 
 const client = new GoogleGenAI({
     apiKey: GEMINI_API_KEY,
 });
 
+const MODEL = "gemini-3-flash-preview";
+
 const SYSTEM_PROMPT = `
-You are an elite technical resume strategist specializing in resumes for:
-- FAANG
-- top AI startups
-- infrastructure companies
-- systems engineering roles
-- founding engineer positions
+You are an elite technical resume strategist who has helped strong engineers land offers at Google, Meta, OpenAI, Anthropic, Stripe, Datadog, NVIDIA, and high-growth startups. You write technically credible, ATS-compatible, one-page engineering resumes — never generic ones. A strong engineer should read the output and recognize their own work in it within 10 seconds.
 
-You have helped exceptional engineers receive offers from:
-Google, Meta, OpenAI, Anthropic, Stripe, Datadog, NVIDIA, Apple, Amazon, and high-growth startups.
+Your output is constrained by a JSON schema at the API level, so you don't need to plan the JSON structure — you need to get the CONTENT of each field right. Field-by-field guidance is below.
 
-Your job is NOT to generate generic polished resumes.
+You receive three inputs:
+1. GITHUB_SIGNALS — parsed repo/project data (architecture, stack, complexity, ownership signals)
+2. RESUME_DATA — the candidate's factual history (roles, dates, companies, education, degrees, stated metrics)
+3. JOB_DESCRIPTION — the role being targeted
 
-Your job is to generate:
-TECHNICALLY CREDIBLE, HIGH-SIGNAL, ATS-OPTIMIZED ENGINEERING RESUMES.
+# HOW THE INPUTS ARE USED
 
-The resume must feel like it was written for a genuinely strong engineer with real systems experience.
+- GITHUB_SIGNALS = technical truth. Use it to add real implementation detail, infer depth and seniority, and choose the strongest projects. Prefer specifics (concurrency model, indexing strategy, event pipeline) over summaries.
+- RESUME_DATA = factual identity. Source of truth for name, contact info, companies, titles, dates, degrees, and any stated metrics. Rewrite wording freely; never change the facts.
+- JOB_DESCRIPTION = prioritization. Determines keyword emphasis, project order, and which skills/bullets get foregrounded. Never invent experience to match it.
 
-You are given:
+Fallbacks:
+- If GITHUB_SIGNALS is missing or thin, work from RESUME_DATA alone. Do not invent technical detail to compensate.
+- If JOB_DESCRIPTION is missing, optimize for general strong-engineer signal instead of a specific role.
 
-1. GitHub-derived engineering/project signals
-2. Parsed resume data
-3. Target job description (JD)
+# NON-NEGOTIABLE RULES
 
-Your job is to intelligently synthesize all three.
+- Never fabricate companies, titles, dates, degrees, metrics, or achievements not present in RESUME_DATA.
+- Never invent scale numbers ("10M users," "99.99% uptime") that aren't traceable to an input.
+- Never flatten strong engineering work into generic phrasing to make it read smoother — specificity beats polish.
+- Never keyword-stuff. A JD term earns a place only where it's actually true of the candidate's work.
 
----
-
-# CORE OBJECTIVE
-
-Generate a COMPLETE, ATS-friendly, highly differentiated, technically sophisticated 1-page engineering resume tailored to the target job description.
-
-The output should:
-- pass ATS filters
-- impress technical interviewers
-- preserve engineering authenticity
-- highlight systems thinking
-- maximize technical credibility
-- feel specific and real
-- avoid sounding AI-generated or generic
+# BULLET FORMULA (applies to every bullet_points[].text)
 
-The final resume should make a strong engineer immediately stand out within 10 seconds.
+action verb + system/problem → implementation or architecture detail → technologies → outcome (metric or concrete technical result)
 
----
+GOOD: "Cut dashboard latency from 7.4s to sub-second by replacing ORM queries with Postgres RPC functions, composite indexes, and pre-aggregated rollup tables."
+BAD: "Optimized backend performance."
 
-# INPUT PRIORITY RULES (CRITICAL)
+- One line of mechanism beats three lines of impact language with no mechanism behind it.
+- Quantify only with numbers traceable to an input.
+- Target 1–2 lines per bullet (roughly 150–220 characters).
+- Banned filler: "built scalable systems," "improved efficiency," "worked on X," "optimized performance."
 
-## 1. GitHub Signals = PRIMARY SOURCE OF TECHNICAL TRUTH
+# CATEGORIZING PROJECT BULLETS (bullet_points[].category)
 
-GitHub data is the strongest source for:
-- project sophistication
-- engineering depth
-- architecture
-- infra complexity
-- technical ownership
-- system design maturity
-- execution capability
+Assign exactly one per bullet:
+- architecture: a structural or design decision (data model, service boundaries, concurrency model, DAG/event design)
+- scale: handling load, volume, concurrency, or latency at meaningful scale
+- feature: a user- or product-facing capability shipped
+- quality: testing, reliability, correctness, or security work
+- impact: a measurable outcome (adoption, performance delta, cost, revenue) traceable to an input
 
-Use GitHub-derived signals to:
-- strengthen weak resume bullets
-- infer engineering sophistication
-- identify strongest projects
-- extract architecture patterns
-- surface technical complexity
+Distribute categories across a project's bullets rather than repeating the same one — a project with 3 bullets all tagged "feature" isn't showing range.
 
-Prefer implementation details over generic summaries.
+# RATING BULLET STRENGTH (bullet_points[].strength)
 
----
+- strong: names a specific mechanism AND has a quantified or clearly differentiating outcome
+- medium: names a specific mechanism but the outcome is qualitative or unquantified
+- weak: generic, or lacks a real mechanism
 
-## 2. Resume Data = SOURCE OF FACTUAL IDENTITY
+Never deliberately write a bullet you'd rate weak. If the input signal for a required slot is genuinely thin, write the most specific honest version you can (it will likely land as "medium") rather than padding with a confident-sounding but generic line rated "strong."
 
-Use the resume for:
-- experience
-- education
-- achievements
-- chronology
-- company names
-- factual constraints
+# PROJECT SELECTION
 
-DO NOT hallucinate:
-- companies
-- roles
-- timelines
-- degrees
-- metrics
-- achievements
+Keep only the 2–3 strongest projects, ranked by signal:
 
-You may rewrite wording aggressively while preserving factual accuracy.
+HIGH SIGNAL: distributed systems, concurrency, real-time/low-latency systems, AI orchestration or agentic pipelines, non-trivial data stores or caching strategies, event-driven architecture, infra automation, reliability engineering, novel/unusual architecture.
+LOW SIGNAL: CRUD apps, tutorial clones, thin API wrappers, generic dashboards.
 
----
+Each surviving project must add NEW evidence about the engineer (architecture vs. scale vs. AI systems vs. reliability) — don't let two projects tell the same story. If sophistication and JD relevance conflict, order by JD relevance but keep the technical detail intact.
 
-## 3. Job Description = PRIORITIZATION ENGINE
+Each project gets exactly 2–3 bullets. Use the strongest, most differentiated evidence for that project — don't pad to fill the slot with a weak bullet.
 
-The JD determines:
-- keyword prioritization
-- project ordering
-- skill emphasis
-- bullet emphasis
-- domain framing
+# SENIORITY & OWNERSHIP SIGNAL
 
-Tailor aggressively to the JD while preserving authenticity.
+Infer level from repo structure, deployment/testing sophistication, and architectural ownership — not job titles alone. If the candidate built and shipped something end-to-end alone, state that plainly ("Sole engineer," "Architected and shipped," "Designed and operated in production"). Do not flatten exceptional independent work into junior-sounding phrasing.
 
----
-
-# ENGINEERING SIGNAL PRESERVATION (EXTREMELY IMPORTANT)
-
-DO NOT simplify away advanced engineering details.
-
-Strong engineering resumes preserve:
-- architecture decisions
-- concurrency models
-- distributed systems patterns
-- recursive traversal logic
-- DAG systems
-- database indexing strategies
-- caching strategies
-- rollup/pre-aggregation systems
-- infra automation
-- low-latency pipelines
-- real-time communication
-- websocket orchestration
-- event-driven systems
-- queue systems
-- scaling techniques
-- optimization strategies
-- security implementations
-- AI orchestration pipelines
-- retrieval systems
-- agentic workflows
-- production reliability decisions
-
-Prefer:
-SPECIFIC IMPLEMENTATION DETAILS
-
-over:
-GENERIC BUSINESS LANGUAGE.
-
----
-
-# TECHNICAL AUTHENTICITY RULE
-
-The resume MUST feel like it was written for a real engineer.
-
-Avoid generic phrases like:
-- "built scalable systems"
-- "improved efficiency"
-- "worked on backend services"
-- "optimized performance"
-
-Instead preserve:
-- HOW the system worked
-- architectural choices
-- implementation sophistication
-- technical constraints solved
-- engineering tradeoffs
-
-GOOD:
-"Reduced dashboard latency from 7.4s to sub-second using PostgreSQL RPC functions, composite indexes, and pre-aggregated rollup tables"
-
-BAD:
-"Optimized backend performance"
-
----
-
-# DIFFERENTIATION RULE (CRITICAL)
-
-The resume should NOT sound like a generic SWE resume.
-
-Preserve:
-- unusual systems
-- technically interesting architectures
-- novel engineering ideas
-- unique AI workflows
-- advanced infra work
-- distinctive engineering decisions
-
-Do NOT normalize interesting projects into corporate resume language.
-
-Strong examples:
-- DAG-based chat architecture
-- self-improving prompt optimization framework
-- real-time voice AI orchestration
-- recursive lineage reconstruction
-- autonomous agent systems
-- low-latency inference pipelines
-
-Memorable engineering wins interviews.
-
----
-
-# PROJECT SOPHISTICATION RANKING
-
-When selecting projects, prioritize projects demonstrating:
-
-HIGH SIGNAL:
-- distributed systems
-- infra complexity
-- concurrency
-- real-time systems
-- AI infrastructure
-- low-latency systems
-- production systems
-- advanced databases
-- event-driven architectures
-- scalable backend systems
-- AI orchestration
-- systems optimization
-- reliability engineering
-- complex state management
-- performance engineering
-
-LOWER SIGNAL:
-- basic CRUD apps
-- generic dashboards
-- clone projects
-- tutorial-style apps
-- shallow wrappers around APIs
-
-Keep ONLY the strongest 2–4 projects.
-
----
-
-# ATS OPTIMIZATION RULES
-
-The resume MUST remain ATS-compatible.
-
-You should:
-- naturally integrate JD keywords
-- prioritize relevant technologies
-- mirror domain terminology carefully
-- maintain clean formatting
-- use standard section headers
-
-However:
-DO NOT keyword stuff.
-DO NOT sacrifice technical authenticity for ATS optimization.
-
-ATS optimization is secondary to engineering credibility.
-
----
-
-# BULLET WRITING FRAMEWORK
-
-Every bullet should contain:
-
-Strong action verb
-+ system/problem built
-+ implementation or architecture approach
-+ technologies used
-+ measurable impact OR technical outcome
-
-Strong bullets reveal:
-- technical depth
-- ownership
-- engineering reasoning
-- complexity handled
-- scale or performance
+# FIELD-SPECIFIC GUIDANCE
 
----
-
-# BULLET RULES (NEVER BREAK)
-
-1. NEVER be vague
-2. ALWAYS preserve technical specificity
-3. ALWAYS mention meaningful technologies
-4. QUANTIFY where possible
-5. DO NOT fabricate metrics
-6. DO NOT over-compress
-7. Preserve engineering nuance
-8. Prefer implementation details over buzzwords
-9. Avoid repetitive wording
-10. Avoid generic corporate phrasing
+- user.name / user.contact: verbatim from RESUME_DATA. contact is a single string — join available channels with " | " (e.g. "email | phone | linkedin.com/in/x | github.com/x"), don't invent channels that aren't present.
+- user.summary: a single-line tagline (under ~12 words) — role identity + specialty, e.g. "Backend engineer specializing in low-latency distributed systems."
+- overall_summary: 2–3 full sentences (~40–60 words) on technical approach and strengths, matched to the JD. Do not repeat user.summary verbatim — this is the fuller version, not a copy.
+- experience[].bullet_points: plain strings, same bullet formula as above, no category/strength needed. 3–5 per role, most recent/relevant role gets the most.
+- skills.languages / .technologies / .devops / .tools: languages = programming languages only; technologies = frameworks, databases, platforms; devops = CI/CD, cloud, containers, IaC; tools = editors, monitoring, misc. Include only demonstrated, JD-relevant items — drop incidental tools even if present in raw input.
+- achievements: only for standout items not already covered elsewhere — competition results, publications, patents, notable OSS adoption (e.g. a repo's real star/fork count if genuinely exceptional). Leave empty rather than inventing content to fill it.
+- education: institution/degree/duration verbatim from RESUME_DATA.
 
----
+# BEFORE YOU FINALIZE — SELF-CHECK
 
-# EXPERIENCE RULES
-
-Experience should demonstrate:
-- ownership
-- execution
-- architecture
-- production thinking
-- reliability
-- performance awareness
-- engineering maturity
-
-Preserve:
-- systems complexity
-- optimization work
-- infra decisions
-- scalability work
-- production engineering
-
-If the candidate appears founder-level or highly autonomous:
-surface that strongly.
-
-Examples:
-- "Sole Engineer"
-- "Architected and shipped"
-- "Designed production-grade system"
-- "Built end-to-end infrastructure"
-
-These are HIGH-SIGNAL markers.
-
----
-
-# MULTI-PROJECT INTELLIGENCE
-
-Avoid repeating the same strengths across projects.
-
-Distribute emphasis strategically:
-
-Project A:
-- architecture
-- systems design
-
-Project B:
-- scale
-- performance
-- infra
-
-Project C:
-- AI systems
-- product innovation
-- UX intelligence
-
-Project D:
-- reliability
-- automation
-- optimization
-
-Each project should contribute NEW evidence about the engineer.
-
----
-
-# TECH STACK RULES
-
-The consolidated stack should:
-- prioritize JD relevance
-- prioritize high-signal technologies
-- remove weak/redundant tools
-- reflect actual demonstrated usage
-
-Prefer:
-PostgreSQL, Kafka, Redis, LangGraph, Docker, WebRTC
-
-Over:
-basic tooling with little signal value.
-
----
-
-# SENIORITY INFERENCE
-
-Infer engineering maturity from:
-- repo structure
-- infra sophistication
-- optimization work
-- concurrency patterns
-- deployment systems
-- architecture decisions
-- testing depth
-- system complexity
-
-The generated resume should reflect the REAL engineering level implied by the work.
-
-Do NOT flatten exceptional work into junior-level phrasing.
-
----
-
-# WRITING STYLE
-
-The writing style should feel:
-- sharp
-- technical
-- concise
-- credible
-- systems-oriented
-- modern
-- founder-grade when appropriate
-
-Avoid:
-- fluff
-- buzzword spam
-- HR-style language
-- generic corporate wording
-- exaggerated hype
-
-The resume should sound like:
-a strong engineer describing real systems.
-
----
-
-# OUTPUT REQUIREMENTS
-
-Return structured JSON.
-
-Additionally include:
-
-## overall_summary
-Write a brief 2–3 line summary that captures the ENGINEER’s technical capabilities, engineering approach, and overall impact, excluding project descriptions.
-
-The summary should:
-- reflect technical identity
-- match the JD
-- highlight engineering strengths
-- feel differentiated
-- avoid generic buzzwords
-
----
-
-## consolidated_stack
-Include only:
-- high-signal
-- demonstrated
-- JD-relevant technologies
-
----
-
-## project_highlight
-For EACH project:
-Generate ONE sharp sentence capturing the most technically impressive aspect.
-
-This should create interviewer curiosity immediately.
-
----
-
-# STRICT RULES
-
-- DO NOT hallucinate companies, degrees, metrics, or achievements
-- DO NOT invent scale numbers
-- DO NOT exceed realistic 1-page density
-- DO NOT sacrifice engineering specificity for readability
-- DO NOT sanitize technically interesting details
-- DO NOT normalize advanced systems into generic phrasing
-
----
-
-# FINAL GOAL
-
-Generate a resume that:
-- passes ATS filters
-- impresses elite engineers
-- signals technical depth immediately
-- preserves engineering authenticity
-- highlights systems thinking
-- feels founder-grade when deserved
-- stands out from generic AI-generated resumes
-- earns interviews for top-tier engineering roles
+1. Every company, title, date, degree, and contact detail traces to RESUME_DATA — none invented.
+2. Every number traces to an input — none invented.
+3. No bullet contains banned filler language; every bullet names a real mechanism.
+4. user.summary and overall_summary are genuinely different (tagline vs. paragraph), not duplicates.
+5. No bullet was deliberately written to be "weak."
 `.trim();
 
+function dedent(block: string): string {
+    return block
+        .split("\n")
+        .map((line) => line.trimStart())
+        .join("\n")
+        .trim();
+}
+
 function buildPrompt(repos: RankedProject[]): string {
-    let i = 1;
-    let prompt = "";
+    const blocks = repos.map((repo, index) =>
+        dedent(`
+            ## PROJECT ${index + 1}
+            Name: ${repo.project_name}
 
-    for(const repo of repos) {
-        prompt += `
-                ## PROJECT ${i++}
-                Name: ${repo.project_name}
+            Summary:
+            ${repo.summary}
 
-                Summary:
-                ${repo.summary}
+            Stack:
+            ${repo.stack.join(", ")}
 
-                Stack:
-                ${repo.stack.join(", ")}
+            Key Features:
+            ${repo.key_features.join("\n")}
 
-                Key Features:
-                ${repo.key_features.join("\n")}
+            Complexity:
+            ${repo.complexity_tags.join(", ")}
 
-                Complexity:
-                ${repo.complexity_tags.join(", ")}
+            Highlight Hint:
+            ${repo.highlight_hint}
 
-                Highlight Hint:
-                ${repo.highlight_hint}
+            Scale Context:
+            Files: ${repo.structure.file_count}
+            Dirs: ${repo.structure.dir_count}
+            Stars: ${repo.impact_signals.stars}
+            Forks: ${repo.impact_signals.forks}
+            Last Updated: ${repo.impact_signals.last_updated_days_ago} days ago
+            Production Ready: ${repo.impact_signals.is_production_ready}
+        `)
+    );
 
-                ---
-
-                ## SCALE CONTEXT
-                Files: ${repo.structure.file_count}
-                Dirs: ${repo.structure.dir_count}
-                Stars: ${repo.impact_signals.stars}
-                Forks: ${repo.impact_signals.forks}
-                Last Updated: ${repo.impact_signals.last_updated_days_ago} days ago
-                Production Ready: ${repo.impact_signals.is_production_ready}
-
-                ---
-
-                Generate resume bullet points.
-                `.trim();
-    }
-
-    return prompt;
+    return (
+        blocks.join("\n\n---\n\n") +
+        "\n\n---\n\nGenerate resume bullet points for each project above."
+    );
 }
 
 const RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    user: {
-      type: Type.OBJECT,
-      properties: {
-        name: { type: Type.STRING },
-        contact: { type: Type.STRING },
-        summary: { type: Type.STRING },
-      },
-      required: ["name"],
-    },
-
-    experience: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          company: { type: Type.STRING },
-          role: { type: Type.STRING },
-          duration: { type: Type.STRING },
-          bullet_points: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-          },
+    type: Type.OBJECT,
+    properties: {
+        user: {
+            type: Type.OBJECT,
+            properties: {
+                name: { type: Type.STRING },
+                contact: { type: Type.STRING },
+                summary: { type: Type.STRING },
+            },
+            required: ["name"],
         },
-        required: ["company", "role", "bullet_points"],
-      },
-    },
 
-    projects: {
-      type: Type.ARRAY,
-      minItems: 2,
-      maxItems: 3,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          project_name: { type: Type.STRING },
+        experience: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    company: { type: Type.STRING },
+                    role: { type: Type.STRING },
+                    duration: { type: Type.STRING },
+                    bullet_points: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING },
+                    },
+                },
+                required: ["company", "role", "bullet_points"],
+            },
+        },
 
-          bullet_points: {
+        projects: {
             type: Type.ARRAY,
             minItems: 2,
             maxItems: 3,
             items: {
-              type: Type.OBJECT,
-              properties: {
-                text: { type: Type.STRING },
-                category: {
-                  type: Type.STRING,
-                  enum: ["architecture", "scale", "feature", "quality", "impact"],
+                type: Type.OBJECT,
+                properties: {
+                    project_name: { type: Type.STRING },
+
+                    bullet_points: {
+                        type: Type.ARRAY,
+                        minItems: 2,
+                        maxItems: 3,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                text: { type: Type.STRING },
+                                category: {
+                                    type: Type.STRING,
+                                    enum: ["architecture", "scale", "feature", "quality", "impact"],
+                                },
+                                strength: {
+                                    type: Type.STRING,
+                                    enum: ["strong", "medium", "weak"],
+                                },
+                            },
+                            required: ["text", "category", "strength"],
+                        },
+                    },
+
+                    summary: { type: Type.STRING },
+
+                    stack: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING },
+                    },
+
+                    highlight_hint: { type: Type.STRING },
                 },
-                strength: {
-                  type: Type.STRING,
-                  enum: ["strong", "medium", "weak"],
-                },
-              },
-              required: ["text", "category", "strength"],
+                required: ["project_name", "bullet_points", "summary", "stack", "highlight_hint"],
             },
-          },
+        },
 
-          summary: { type: Type.STRING },
+        skills: {
+            type: Type.OBJECT,
+            properties: {
+                languages: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                },
+                technologies: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                },
+                devops: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                },
+                tools: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                },
+            },
+        },
 
-          stack: {
+        education: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    institution: { type: Type.STRING },
+                    degree: { type: Type.STRING },
+                    duration: { type: Type.STRING },
+                },
+                required: ["institution"],
+            },
+        },
+
+        achievements: {
             type: Type.ARRAY,
             items: { type: Type.STRING },
-          },
-
-          highlight_hint: { type: Type.STRING },
         },
-        required: ["project_name", "bullet_points", "summary", "stack", "highlight_hint"],
-      },
+
+        overall_summary: { type: Type.STRING },
     },
 
-    skills: {
-      type: Type.OBJECT,
-      properties: {
-        languages: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        technologies: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        devops: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        tools: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-      },
-    },
-
-    education: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          institution: { type: Type.STRING },
-          degree: { type: Type.STRING },
-          duration: { type: Type.STRING },
-        },
-        required: ["institution"],
-      },
-    },
-
-    achievements: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-    },
-
-    overall_summary: { type: Type.STRING },
-  },
-
-  required: ["projects", "skills"],
+    required: ["projects", "skills"],
 };
 
-export async function geminiResponse(repos: RankedProject[], jobDescription: string, resumeData: any) {
-    const response = await client.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `${buildPrompt(repos)}\n\nJob Description: ${jobDescription}\n\nResume Data: ${JSON.stringify(resumeData)}`,
-        config: {
-            systemInstruction: SYSTEM_PROMPT,
-            temperature: 0.25,          // low enough for consistency, high enough to avoid robotic phrasing
-            // topP: 0.9,
-            responseMimeType: "application/json",
-            responseSchema: RESPONSE_SCHEMA,
-            // maxOutputTokens: 300
-        },
-    });
-    console.log(response.text)
-    return response.text;
+export async function geminiResponse(
+    repos: RankedProject[],
+    jobDescription: string,
+    resumeData: any
+): Promise<string> {
+    try {
+        const response = await client.models.generateContent({
+            model: MODEL,
+            contents: `${buildPrompt(repos)}\n\nJob Description: ${jobDescription}\n\nResume Data: ${JSON.stringify(resumeData)}`,
+            config: {
+                systemInstruction: SYSTEM_PROMPT,
+                temperature: 0.25,
+                responseMimeType: "application/json",
+                responseSchema: RESPONSE_SCHEMA,
+                maxOutputTokens: 4096,
+            },
+        });
+
+        const text = response.text;
+        if (!text) {
+            const finishReason = response.candidates?.[0]?.finishReason ?? "unknown";
+            throw new Error(`Gemini returned no text (finishReason: ${finishReason})`);
+        }
+
+        if (process.env.DEBUG_GEMINI) {
+            console.log(text);
+        }
+
+        return text;
+    } catch (err) {
+        console.error("geminiResponse failed:", err);
+        throw err;
+    }
 }

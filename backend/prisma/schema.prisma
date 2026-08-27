@@ -12,53 +12,84 @@ datasource db {
 }
 
 model User {
-  id                String      @id @default(uuid())
-  githubUsername    String      @unique
-  name              String?
-  email             String?
-  createdAt         DateTime @default(now())
+  id             String   @id @default(uuid())
+  githubUsername String   @unique
+  name           String?
+  email          String?
+  createdAt      DateTime @default(now())
 
-  repos             RepoCache[]
-  resumes           Resume[]
-  userCache         UserCache?
+  repos     RepoCache[]
+  resumes   Resume[]
+  userCache UserCache?
 }
 
 model UserCache {
-  id            String      @id @default(uuid())
-  userId        String      @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  details       Json
+  details Json
 
   @@index([userId])
 }
 
 model RepoCache {
-  id            String      @id @default(uuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  repoName      String
-  score         Float
+  repoName String
+  score    Float
 
-  pushedAt      DateTime?
+  pushedAt DateTime?
 
-  metadata      Json?
+  metadata Json?
 
-  lastComputed  DateTime  @default(now())
+  lastComputed DateTime @default(now())
 
   @@index([userId])
 }
 
 model Resume {
-  id          String      @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  markdown    String
-  resumeUrl   String?
+  markdown  String
+  resumeUrl String?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// Cleaner Schema from here
+
+model Company {
+  id         Int     @id @default(autoincrement())
+  name       String
+  boardToken String? @unique
+  jobs       Job[]
+}
+
+model Job {
+  id          Int       @id @default(autoincrement())
+  companyId   Int
+  companyName String
+  externalId  BigInt
+  title       String
+  content     String?
+  absoluteUrl String?
+  location    String?
+  isActive    Boolean   @default(true)
+  metadata    Json?
+  department  Json?
+  offices     Json?
+  postedAt    DateTime?
+  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, externalId])
 }
