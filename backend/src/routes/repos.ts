@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import RankingSystem from '../function/rankingSys.js';
 import axios from 'axios';
 import { configDotenv } from 'dotenv';
+import { getAuth } from '@clerk/express';
 
 configDotenv();
 const token = process.env.GITHUB_TOKEN;
@@ -12,22 +13,24 @@ export const repoRouter = express.Router();
 
 repoRouter.post('/rank', async (req, res) => {
     try {
+        let { userId } = getAuth(req);
+
         const { username } = req.body;
         let rankedRepos: any[] = [];
         let user: any = null;
+
+        if(!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         if (!username) {
             return res.status(400).json({ error: "Username is required" });
         }
 
-        const userResponse = await axios
-            .get(`https://api.github.com/users/${username}`, githubHeaders ? { headers: githubHeaders } : {})
-            .catch(() => null);
-
         try {
             user = await prisma.user.findUnique({
                 where: {
-                    githubUsername: username,
+                    clerkUserId: userId,
                 },
             });
         } catch (dbErr) {
@@ -36,21 +39,17 @@ repoRouter.post('/rank', async (req, res) => {
 
         if (!user) {
             try {
-                user = await prisma.user.create({
+                user = await prisma.user.update({
+                    where: {
+                        clerkUserId: userId
+                    },
                     data: {
                         githubUsername: username,
-                        name: userResponse?.data?.name || username,
-                        email: userResponse?.data?.email || null,
                     },
                 });
             } catch (dbErr) {
-                console.error("Prisma create user failed:", dbErr);
-                user = {
-                    id: null,
-                    githubUsername: username,
-                    name: userResponse?.data?.name || username,
-                    email: userResponse?.data?.email || null,
-                };
+                console.error("Prisma update user failed:", dbErr);
+                return res.status(500).json({ error: 'Failed to update user with GitHub username' });
             }
 
             const repoResponse = await axios
@@ -76,10 +75,10 @@ repoRouter.post('/rank', async (req, res) => {
                     try {
                         await prisma.repoCache.create({
                             data: {
-                            userId: user.id,
-                            repoName: ranked.project_name,
-                            score: ranked.score,
-                            metadata: metadata,
+                                userId: user.id,
+                                repoName: ranked.project_name,
+                                score: ranked.score,
+                                metadata: metadata,
                             },
                         });
                     } catch (cacheErr) {

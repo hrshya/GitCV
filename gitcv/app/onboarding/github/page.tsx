@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, CornerDownLeft, MessageCircle, Loader2 } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
+import axios from "axios";
 
 type GithubProfile = {
   avatar_url: string;
@@ -17,6 +19,7 @@ export default function GithubOnboardingPage() {
   const [username, setUsername] = useState("");
   const [profile, setProfile] = useState<GithubProfile | null>(null);
   const [status, setStatus] = useState("idle"); // idle | loading | found | not-found
+  const { getToken } = useAuth();
 
   useEffect(() => {
     const trimmed = username.trim();
@@ -42,6 +45,24 @@ export default function GithubOnboardingPage() {
 
     return () => clearTimeout(timeout);
   }, [username]);
+
+  const handleContinue = async () => {
+    if (status !== "found" || !profile) return;
+    try {
+      const token = await getToken();
+      await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/github/`, {
+        username: username,
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Failed to connect GitHub", error);
+    }
+  };
 
   return (
     <div className="max-h-screen bg-[#F6F7F9] font-sans">
@@ -134,7 +155,7 @@ export default function GithubOnboardingPage() {
             <div className="mt-8 flex items-center gap-4">
               <button
                 disabled={status !== "found"}
-                onClick={() => router.push("/dashboard")}
+                onClick={handleContinue}
                 className="flex items-center gap-2 bg-[#111318] text-white text-sm font-medium px-5 py-3 rounded-lg hover:bg-[#22252d] transition disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 Continue

@@ -1,3 +1,5 @@
+import { useRouter } from "next/navigation";
+
 type Department = {
   id: number;
   name: string;
@@ -73,6 +75,7 @@ export default function JobCard({
   const radius = 26;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (matchPercent / 100) * circumference;
+  const router = useRouter();
 
   const companyName = job.companyName;
   const postedAgo = formatPostedAgo(job.postedAt);
@@ -170,7 +173,8 @@ export default function JobCard({
 
             <button
                 onClick={() => {
-                  job.absoluteUrl && window.open(job.absoluteUrl, "_blank");
+                  // job.absoluteUrl && window.open(job.absoluteUrl, "_blank");
+                  router.push(`/dashboard/${job.id}`);
                 }}
                 className="rounded-full bg-black px-4 text-xs font-light text-white transition-colors hover:bg-gray-800"
             >

@@ -13,14 +13,16 @@ datasource db {
 
 model User {
   id             String   @id @default(uuid())
-  githubUsername String   @unique
+  clerkUserId    String?   @unique
+  githubUsername String?  
   name           String?
   email          String?
   createdAt      DateTime @default(now())
 
-  repos     RepoCache[]
-  resumes   Resume[]
-  userCache UserCache?
+  repos           RepoCache[]
+  resumes         Resume[]
+  userCache       UserCache?
+  personalDetails Json?
 }
 
 model UserCache {

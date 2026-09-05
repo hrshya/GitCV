@@ -21,79 +21,79 @@ export async function markdownToPDF(mdPath: string, outputPath: string) {
 
   const htmlContent = `
 <html>
-<head>
-  <style>
-    body {
-      font-family: "Calibri", Arial, sans-serif;
-      max-width: 800px;
-      margin: auto;
-      padding: 28px;
-      font-size: 12px;
-      line-height: 1.4;
-      color: #000;
-    }
+  <head>
+    <style>
+      body {
+        font-family: "Calibri", Arial, sans-serif;
+        max-width: 800px;
+        margin: auto;
+        padding: 28px;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #000;
+      }
 
-    /* NAME */
-    h1 {
-      font-size: 22px;
-      margin-bottom: 2px;
-    }
+      /* NAME */
+      h1 {
+        font-size: 22px;
+        margin-bottom: 2px;
+      }
 
-    /* CONTACT LINE */
-    h1 + p {
-      font-size: 11px;
-      margin-bottom: 10px;
-      color: #333;
-    }
+      /* CONTACT LINE */
+      h1 + p {
+        font-size: 11px;
+        margin-bottom: 10px;
+        color: #333;
+      }
 
-    /* SECTION HEADERS */
-    h2 {
-      font-size: 13px;
-      margin-top: 14px;
-      margin-bottom: 6px;
-      border-bottom: 1px solid #000;
-      padding-bottom: 2px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+      /* SECTION HEADERS */
+      h2 {
+        font-size: 13px;
+        margin-top: 14px;
+        margin-bottom: 6px;
+        border-bottom: 1px solid #000;
+        padding-bottom: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
 
-    /* SUBHEAD (Company | Stack) */
-    h3 {
-      font-size: 12px;
-      margin: 6px 0 2px 0;
-      display: flex;
-      justify-content: space-between;
-    }
+      /* SUBHEAD (Company | Stack) */
+      h3 {
+        font-size: 12px;
+        margin: 6px 0 2px 0;
+        display: flex;
+        justify-content: space-between;
+      }
 
-    /* DATE ALIGN RIGHT */
-    .right {
-      float: right;
-      color: #444;
-    }
+      /* DATE ALIGN RIGHT */
+      .right {
+        float: right;
+        color: #444;
+      }
 
-    p {
-      margin: 2px 0;
-    }
+      p {
+        margin: 2px 0;
+      }
 
-    ul {
-      margin: 4px 0 8px 16px;
-      padding: 0;
-    }
+      ul {
+        margin: 4px 0 8px 16px;
+        padding: 0;
+      }
 
-    li {
-      margin-bottom: 3px;
-    }
+      li {
+        margin-bottom: 3px;
+      }
 
-    strong {
-      font-weight: 600;
-    }
+      strong {
+        font-weight: 600;
+      }
 
-    /* SKILLS INLINE FORMAT */
-    .skills p {
-      margin: 2px 0;
-    }
+      /* SKILLS INLINE FORMAT */
+      .skills p {
+        margin: 2px 0;
+      }
 
-    </style>
+      </style>
         </head>
         <body>
         ${marked(markdown)}

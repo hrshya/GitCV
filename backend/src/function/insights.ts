@@ -9,8 +9,6 @@ type Signals = {
 
 export function generateInsights(signals: Signals, complexity_tags: string[], key_features: string[]) {
 
-  // ---------- COMPLEXITY TAGS ----------
-
   if (
     signals.core.frontend &&
     signals.core.backend &&
@@ -145,8 +143,6 @@ export function generateInsights(signals: Signals, complexity_tags: string[], ke
       "Documented system architecture and usage for better developer experience"
     );
   }
-
-  // ---------- CLEANUP ----------
 
   return {
     complexity_tags: [...new Set(complexity_tags)],
