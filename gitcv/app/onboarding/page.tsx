@@ -4,6 +4,7 @@ import axios from "axios";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UploadCloud, LogOut, CornerDownLeft, MessageCircle } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
 
 export default function ResumeUploadPage() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function ResumeUploadPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { getToken } = useAuth();
 
   const handleFiles = (files: FileList | null) => {
     if (files && files[0]) {
@@ -26,15 +28,18 @@ export default function ResumeUploadPage() {
     formData.append("resumePdf", selectedFile);
 
     try {
-      await axios.post("http://localhost:3001/api/v1/resume/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+        const token = await getToken();
 
-      router.push("/onboarding/github");
+        await axios.post("http://localhost:3001/api/v1/resume/upload", formData, {
+            headers: {
+            "Content-Type": "multipart/form-data",
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        router.push("/onboarding/github");
     } catch (error) {
-      console.error("Resume upload failed", error);
+        console.error("Resume upload failed", error);
     }
   };
 

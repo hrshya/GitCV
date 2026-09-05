@@ -4,6 +4,9 @@ import dotenv from "dotenv";
 import { githubRouter } from "./routes/github.js";
 import { jobsRouter } from "./routes/jobs.js";
 import { resumeRouter } from "./routes/resume.js";
+import { userRouter } from "./routes/user.js";
+import { clerkMiddleware } from "@clerk/express";
+import { repoRouter } from "./routes/repos.js";
 
 dotenv.config();
 const PORT = Number(process.env.PORT || 3001);
@@ -17,12 +20,15 @@ const allowedOrigins = [
 ];
 
 const app = express();
-app.use(express.json());
+
 app.use(cors({}));
+app.use('/api/v1/user', userRouter);
+app.use(express.json());
 
 app.use('/api/v1/github', githubRouter);
-app.use('/api/v1/jobs', jobsRouter);
-app.use('/api/v1/resume', resumeRouter);
+app.use('/api/v1/jobs', clerkMiddleware(), jobsRouter);
+app.use('/api/v1/resume', clerkMiddleware(), resumeRouter);
+app.use('/api/v1/repo', clerkMiddleware(), repoRouter);
 // app.use('/api/v1/product', productRouter);
 
 app.get("/", (_req, res) => {

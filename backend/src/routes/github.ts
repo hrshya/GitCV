@@ -19,6 +19,7 @@ dotenv.config();
 export const githubRouter = express.Router();
 const token = process.env.GITHUB_TOKEN;
 const githubHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
+let idx = 0;
 
 
 type RateLimitSubject = {
@@ -119,96 +120,20 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
       .catch(() => ({ data: [] }));
 
     let user: any = null;
-    try {
-      user = await prisma.user.findUnique({
-        where: {
-          githubUsername: username,
-        },
-      });
-    } catch (dbErr) {
-      console.error("Prisma find user failed:", dbErr);
-    }
 
     let rankedRepos: any[] = [];
 
-    if (!user) {
-      try {
-        user = await prisma.user.create({
-          data: {
-            githubUsername: username,
-            name: userResponse?.data?.name || username,
-            email: userResponse?.data?.email || null,
-          },
-        });
-      } catch (dbErr) {
-        console.error("Prisma create user failed:", dbErr);
-        user = {
-          id: null,
-          githubUsername: username,
-          name: userResponse?.data?.name || username,
-          email: userResponse?.data?.email || null,
-        };
-      }
+    user = {
+      id: idx++,
+      githubUsername: username,
+      name: userResponse?.data?.name || username,
+      email: userResponse?.data?.email || null,
+    };
 
       rankedRepos = await RankingSystem(
         repoResponse?.data || [],
         username
       );
-
-      if (user?.id) {
-        for (const ranked of rankedRepos) {
-          const metadata = {
-            summary: ranked.summary,
-            stack: ranked.stack,
-            key_features: ranked.key_features,
-            complexity_tags: ranked.complexity_tags,
-            impact_signals: ranked.impact_signals,
-            structure: ranked.structure,
-            highlight_hint: ranked.highlight_hint,
-          };
-          try {
-            await prisma.repoCache.create({
-              data: {
-                userId: user.id,
-                repoName: ranked.project_name,
-                score: ranked.score,
-                metadata: metadata,
-              },
-            });
-          } catch (cacheErr) {
-            console.error("Prisma repo cache write failed:", cacheErr);
-          }
-        }
-      }
-    }
-
-    if (!rankedRepos || rankedRepos.length === 0) {
-      if (user?.id) {
-        try {
-          const cachedRepos = await prisma.repoCache.findMany({
-            where: {
-              userId: user.id,
-            },
-          });
-          rankedRepos = cachedRepos.map((cache: any) => ({
-            project_name: cache.repoName,
-            score: cache.score,
-            summary: cache.metadata.summary,
-            stack: cache.metadata.stack,
-            key_features: cache.metadata.key_features,
-            complexity_tags: cache.metadata.complexity_tags,
-            impact_signals: cache.metadata.impact_signals,
-            structure: cache.metadata.structure,
-            highlight_hint: cache.metadata.highlight_hint,
-          }));
-        } catch (cacheErr) {
-          console.error("Prisma repo cache read failed:", cacheErr);
-          rankedRepos = [];
-        }
-      } else {
-        rankedRepos = [];
-      }
-    }
 
     // ---------- LLM RESPONSE ----------
 
@@ -255,39 +180,6 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
         education: [],
         achievements: [],
       };
-    }
-
-    if (user?.id) {
-      let userCache: any = null;
-      try {
-        userCache = await prisma.userCache.findUnique({
-          where: {
-            userId: user.id,
-          },
-        });
-      } catch (cacheErr) {
-        console.error("Prisma user cache read failed:", cacheErr);
-      }
-
-      if(!userCache) {
-        let temp = {
-          name: response?.user?.name || username,
-          contact: response?.user?.contact || "",
-          experience: response?.experience || [],
-          education: response?.education || [],
-          skills: response?.skills || {},
-        }
-        try {
-          await prisma.userCache.create({
-            data: {
-              userId: user.id,
-              details: temp,
-            },
-          });
-        } catch (cacheErr) {
-          console.error("Prisma user cache write failed:", cacheErr);
-        }
-      }
     }
 
     // ---------- RESUME MARKDOWN ----------
@@ -352,21 +244,6 @@ githubRouter.post("/", handleResumeUpload, async (req, res) => {
       resumeId,
       userId: user?.id || null,
     });
-
-    if (user?.id) {
-      try {
-        await prisma.resume.create({
-          data: {
-            id: resumeId,
-            userId: user.id,
-            markdown: resumeMarkdown,
-            resumeUrl: downloadUrl,
-          },
-        });
-      } catch (resumeErr) {
-        console.error("Prisma resume write failed:", resumeErr);
-      }
-    }
 
     generationCompleted = true;
     const generationUsage = reservations.reduce(
