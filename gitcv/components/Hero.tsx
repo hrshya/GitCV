@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
-import { Button } from "./magicui/osbutton"
+import { OsButton } from "./magicui/osbutton"
 
 export function WebGLShader() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -156,9 +156,9 @@ export function WebGLShader() {
                   Upload your resume, paste a job description, and generate a tailored, ATS-friendly resume using your most relevant projects.
                 </p>
                 <div className="mt-4 flex flex-col gap-4 sm:flex-row">
-                  <Button>
+                  <OsButton>
                     Generate
-                  </Button>
+                  </OsButton>
                   <a href="#features" className="inline-flex min-w-50 items-center justify-center rounded-[12px] border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-50">
                     See how it works
                   </a>

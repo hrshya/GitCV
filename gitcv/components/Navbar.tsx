@@ -74,7 +74,7 @@ export function Navbar() {
         <div className="hidden sm:flex items-center gap-2 sm:gap-3">
           <Show when="signed-out">
             <Button>
-            <SignInButton forceRedirectUrl="/onboarding" />
+              <SignInButton forceRedirectUrl="/onboarding" />
             </Button>
           </Show>
           <Show when="signed-in">
