@@ -3,8 +3,10 @@
 import axios from "axios";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud, LogOut, CornerDownLeft, MessageCircle } from "lucide-react";
+import { UploadCloud, LogOut, CornerDownLeft } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 
 export default function ResumeUploadPage() {
   const router = useRouter();
@@ -30,7 +32,7 @@ export default function ResumeUploadPage() {
     try {
         const token = await getToken();
 
-        await axios.post("http://localhost:3001/api/v1/resume/upload", formData, {
+        await axios.post(`${BACKEND_URL}/api/v1/resume/upload`, formData, {
             headers: {
             "Content-Type": "multipart/form-data",
                 Authorization: `Bearer ${token}`,

@@ -3,7 +3,7 @@ import { WebGLShader } from "@/components/Hero";
 import { AnimatedList } from "@/components/magicui/animated-list";
 import { CardStack } from "@/components/magicui/card-stack";
 import { AnimatedListDemo } from "@/components/magicui/list";
-import { Button } from "@/components/magicui/osbutton";
+import { Button, OsButton } from "@/components/magicui/osbutton";
 import { Ripple } from "@/components/magicui/ripple";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { StripedPattern } from "@/components/magicui/stripedline";
@@ -191,9 +191,9 @@ export default function Home() {
               Use the right projects for the right role, automatically.
             </p>
             <div className="mt-8 flex justify-center">
-              <Button>
+              <OsButton>
                 Generate My Resume
-              </Button>
+              </OsButton>
             </div>
           </div>
         </WobbleCard>
